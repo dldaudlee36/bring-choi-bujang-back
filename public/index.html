@@ -12,6 +12,22 @@
     h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
     p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
     .notice { margin: 26px 0; padding: 18px; border: 1px solid #d07384; border-radius: 14px; color: #ffe3e8; background: #612a3544; }
+    .auth-panel { margin: 24px 0; padding: 22px; border: 1px solid #51667c; border-radius: 14px; background: #152233; }
+    .auth-panel h2 { margin: 0 0 16px; font-size: 20px; color: #ecf4ff; }
+    .auth-form { display: grid; gap: 14px; }
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 14px; color: #8ad8df; font-weight: 600; }
+    .field input { background: #0c1521; border: 1px solid #51667c; border-radius: 8px; padding: 10px 14px; color: #ecf4ff; font-size: 15px; }
+    .field input:focus { outline: 2px solid #8ad8df; border-color: transparent; }
+    button { cursor: pointer; border-radius: 8px; border: none; font-size: 15px; font-weight: 600; padding: 10px 16px; transition: background 0.15s; }
+    #login-button { background: #2563eb; color: #fff; margin-top: 6px; }
+    #login-button:hover { background: #1d4ed8; }
+    #logout-button { background: #475569; color: #fff; }
+    #logout-button:hover { background: #334155; }
+    .auth-error { color: #f87171; font-size: 14px; line-height: 1.5; min-height: 20px; }
+    .user-profile { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .user-info { display: flex; flex-direction: column; gap: 4px; }
+    .user-label { font-size: 13px; color: #8ad8df; }
     ul { list-style: none; display: grid; gap: 12px; padding: 0; }
     li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
     strong { display: block; font-size: 18px; margin-bottom: 5px; }
@@ -20,13 +36,117 @@
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 1단계 피해 확인</div>
+    <div class="eyebrow">BYTE BACK · 3단계 로그인</div>
     <h1>점령된 자료실</h1>
     <p>지금은 보호 장치가 없는 상태입니다. 아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
+
+    <section id="auth-panel" class="auth-panel" aria-label="사용자 인증">
+      <h2>자료실 출입 인증</h2>
+      <form id="login-form" class="auth-form">
+        <div class="field">
+          <label for="email">이메일</label>
+          <input type="email" id="email" required autocomplete="email" placeholder="user@example.com">
+        </div>
+        <div class="field">
+          <label for="password">비밀번호</label>
+          <input type="password" id="password" required autocomplete="current-password" placeholder="비밀번호">
+        </div>
+        <button type="submit" id="login-button">로그인</button>
+        <div id="auth-error" class="auth-error" role="alert" aria-live="assertive"></div>
+      </form>
+
+      <div id="user-profile" class="user-profile" style="display: none;">
+        <div class="user-info">
+          <span class="user-label">접속 중인 계정</span>
+          <strong id="user-email"></strong>
+        </div>
+        <button type="button" id="logout-button">로그아웃</button>
+      </div>
+    </section>
+
     <div class="notice">로그인하지 않은 방문자도 자료를 볼 수 있습니다. 공개 범위를 확인하고, 다음 제작 단계에서 접근을 차례로 막아 주세요.</div>
     <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
   </main>
   <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+    const SUPABASE_URL = 'https://mxiycelcxviyvsixuytr.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXljZWxjeHZpeXZzaXh1eXRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMzMyNjksImV4cCI6MjEwNjgwOTI2OX0.5HwJj0sdBYp0U0pdcwXcjfZoE5Z_vYMYU55ll33SP-c';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const loginForm = document.querySelector('#login-form');
+    const userProfile = document.querySelector('#user-profile');
+    const emailInput = document.querySelector('#email');
+    const passwordInput = document.querySelector('#password');
+    const authError = document.querySelector('#auth-error');
+    const userEmail = document.querySelector('#user-email');
+    const logoutButton = document.querySelector('#logout-button');
+    const loginButton = document.querySelector('#login-button');
+
+    function renderAuthState(user) {
+      if (user) {
+        loginForm.style.display = 'none';
+        userProfile.style.display = 'flex';
+        userEmail.textContent = user.email || '(이메일 정보 없음)';
+        authError.textContent = '';
+      } else {
+        loginForm.style.display = 'grid';
+        userProfile.style.display = 'none';
+        userEmail.textContent = '';
+      }
+    }
+
+    loginForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      authError.textContent = '';
+      loginButton.disabled = true;
+      loginButton.textContent = '로그인 중...';
+
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) {
+          authError.textContent = `로그인 실패: ${error.message}`;
+        } else {
+          passwordInput.value = '';
+          renderAuthState(data.user);
+        }
+      } catch (err) {
+        authError.textContent = `오류 발생: ${err.message}`;
+      } finally {
+        loginButton.disabled = false;
+        loginButton.textContent = '로그인';
+      }
+    });
+
+    logoutButton.addEventListener('click', async () => {
+      logoutButton.disabled = true;
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) {
+          alert(`로그아웃 실패: ${error.message}`);
+        } else {
+          renderAuthState(null);
+        }
+      } catch (err) {
+        alert(`로그아웃 오류: ${err.message}`);
+      } finally {
+        logoutButton.disabled = false;
+      }
+    });
+
+    // 세션 초기화 및 변경 감지
+    const { data: { session } } = await supabase.auth.getSession();
+    renderAuthState(session?.user ?? null);
+
+    supabase.auth.onAuthStateChange((_event, session) => {
+      renderAuthState(session?.user ?? null);
+    });
+
+    // 가상 메모 목록 로딩
     const list = document.querySelector('#notes');
     try {
       const response = await fetch('/api/notes', { cache: 'no-store' });
