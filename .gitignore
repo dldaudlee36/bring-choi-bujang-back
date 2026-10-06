@@ -4,3 +4,8 @@ bundle-notes.json
 .env.*
 node_modules/
 public/aleph.json
+docs/01_project_proposal.md
+docs/02_system_architecture.md
+docs/03_data_schema.md
+portfolio/
+schemas/
