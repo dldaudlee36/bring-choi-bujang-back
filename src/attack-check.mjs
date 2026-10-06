@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step !== 1 && config.step !== 2 && config.step !== 3 && config.step !== 4) {
+  if (config.step !== 1 && config.step !== 2 && config.step !== 3 && config.step !== 4 && config.step !== 5) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -138,7 +138,94 @@ export async function runAttackChecks(config) {
     return results;
   }
 
-  // 4단계 점검: 소유권 분리 및 비인가 요청 거부 점검
+  if (config.step === 4) {
+    const results = [];
+
+    // 점검 1: 비로그인 정적 파일(/data.json) 미노출 유지 확인
+    const dataResponse = await fetch(new URL('/data.json', app), {
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+    });
+    let dataEmpty = false;
+    let hasMarker = false;
+    if (dataResponse.ok) {
+      try {
+        const data = await dataResponse.json();
+        dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
+        hasMarker = Boolean(data?.sampleMarker);
+      } catch {
+        // non-JSON
+      }
+    }
+    results.push({
+      attackId: 'anonymous_static_read',
+      expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
+      observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 비어 있음 확인' : `비로그인 /data.json 응답 이상 (HTTP ${dataResponse.status})`,
+    });
+
+    // 점검 2: 비로그인 /api/notes 목록 조회 시 401 거부 확인
+    const apiResponse = await fetch(new URL('/api/notes', app), {
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'anonymous_api_read',
+      expected: '비로그인 /api/notes 목록 요청 시 401 Unauthorized로 거부됨',
+      observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
+    });
+
+    // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인
+    const postResponse = await fetch(new URL('/api/notes', app), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'probe', body: 'probe' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'anonymous_api_write',
+      expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
+      observed: postResponse.status === 401 ? '비로그인 /api/notes POST 요청 시 401 거부 확인' : `비로그인 /api/notes POST 요청이 차단되지 않음 (HTTP ${postResponse.status})`,
+    });
+
+    // 점검 4: 비로그인 /api/notes/:id 단건 접근 시 401 거부 확인
+    const itemResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
+      redirect: 'error', signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'anonymous_item_access',
+      expected: '비로그인 /api/notes/:id 단건 요청 시 401 Unauthorized로 거부됨',
+      observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
+    });
+
+    // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인
+    const putResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'probe_update', body: 'probe_update' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'anonymous_item_modify',
+      expected: '비로그인 /api/notes/:id 수정 요청 시 401 Unauthorized로 거부됨',
+      observed: putResponse.status === 401 ? '비로그인 /api/notes/:id PUT 요청 시 401 거부 확인' : `비로그인 /api/notes/:id PUT 요청이 차단되지 않음 (HTTP ${putResponse.status})`,
+    });
+
+    // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인
+    const deleteResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
+      method: 'DELETE',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'anonymous_item_delete',
+      expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
+      observed: deleteResponse.status === 401 ? '비로그인 /api/notes/:id DELETE 요청 시 401 거부 확인' : `비로그인 /api/notes/:id DELETE 요청이 차단되지 않음 (HTTP ${deleteResponse.status})`,
+    });
+
+    return results;
+  }
+
+  // 5단계 점검: 원본 Supabase REST API 직접 접근 차단 및 Vercel 단일 진입로 점검
   const results = [];
 
   // 점검 1: 비로그인 정적 파일(/data.json) 미노출 유지 확인
@@ -220,6 +307,31 @@ export async function runAttackChecks(config) {
     attackId: 'anonymous_item_delete',
     expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
     observed: deleteResponse.status === 401 ? '비로그인 /api/notes/:id DELETE 요청 시 401 거부 확인' : `비로그인 /api/notes/:id DELETE 요청이 차단되지 않음 (HTTP ${deleteResponse.status})`,
+  });
+
+  // 점검 7: 원본 Supabase 자료 API 직접 조회(GET) 시도 시 차단 확인 (영덕대게이트 방어)
+  const origReadResponse = await fetch(new URL(config.originalApiUrl), {
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  });
+  results.push({
+    attackId: 'direct_original_api_read',
+    expected: '원본 Supabase REST API 직접 조회 요청 시 401 Unauthorized로 거부됨',
+    observed: origReadResponse.status === 401 ? '원본 Supabase REST API 직접 GET 요청 시 401 거부 확인' : `원본 API 직접 조회가 차단되지 않음 (HTTP ${origReadResponse.status})`,
+  });
+
+  // 점검 8: 원본 Supabase 자료 API 직접 수정(POST) 시도 시 차단 확인 (과메기억상실 방어)
+  const origWriteResponse = await fetch(new URL(config.originalApiUrl), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'probe' }),
+    redirect: 'error',
+    signal: AbortSignal.timeout(10000),
+  });
+  results.push({
+    attackId: 'direct_original_api_write',
+    expected: '원본 Supabase REST API 직접 쓰기 요청 시 401 Unauthorized로 거부됨',
+    observed: origWriteResponse.status === 401 ? '원본 Supabase REST API 직접 POST 요청 시 401 거부 확인' : `원본 API 직접 쓰기가 차단되지 않음 (HTTP ${origWriteResponse.status})`,
   });
 
   return results;
