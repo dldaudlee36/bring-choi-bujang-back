@@ -116,14 +116,17 @@ export default async function handler(request, response) {
         if (!data) {
           return response.status(404).json({ error: 'NOT_FOUND' });
         }
+        // 타인 메모 접근 차단 (본인 확인)
+        if (data.owner_id !== verifiedUser.userId) {
+          return response.status(403).json({ error: 'FORBIDDEN' });
+        }
         return response.status(200).json(formatNote(data));
       } else {
-        // 목록 GET: /api/notes -> 로그인 사용자의 메모 배열
-        // 로그인 사용자의 메모 또는 기본 공개 가상 메모(owner_id is null)
+        // 목록 GET: /api/notes -> 본인의 메모만 조회
         const { data, error } = await supabase
           .from('notes')
           .select('*')
-          .or(`owner_id.eq.${verifiedUser.userId},owner_id.is.null`)
+          .eq('owner_id', verifiedUser.userId)
           .order('created_at', { ascending: true });
 
         if (error) {
@@ -144,6 +147,7 @@ export default async function handler(request, response) {
       }
 
       const noteId = body.id?.trim() || randomUUID();
+      // URL·본문의 owner_id를 신뢰하지 않고 검증된 토큰의 사용자 ID로 저장
       let insertData = {
         id: noteId,
         title,
@@ -185,24 +189,44 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOT_FOUND' });
       }
 
+      // 기존 행의 소유자가 본인인지 확인
+      if (existing.owner_id !== verifiedUser.userId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+
       const body = await parseBody(request);
+
+      // 새 행의 소유자 확인 (소유자 변경 시도 차단)
+      if (body.owner_id !== undefined && body.owner_id !== verifiedUser.userId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+      if (request.query?.owner_id !== undefined && request.query.owner_id !== verifiedUser.userId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+
       const title = body.title !== undefined ? body.title : existing.title;
       const noteBody = body.body !== undefined ? body.body : (existing.body ?? existing.content ?? '');
 
       let updateData = {
         title,
         body: noteBody,
+        owner_id: verifiedUser.userId,
       };
 
       let { error: updateError } = await supabase
         .from('notes')
         .update(updateData)
-        .eq('id', id);
+        .eq('id', id)
+        .eq('owner_id', verifiedUser.userId);
 
       if (updateError && updateError.message?.includes("'body' column")) {
         delete updateData.body;
         updateData.content = noteBody;
-        const retry = await supabase.from('notes').update(updateData).eq('id', id);
+        const retry = await supabase
+          .from('notes')
+          .update(updateData)
+          .eq('id', id)
+          .eq('owner_id', verifiedUser.userId);
         updateError = retry.error;
       }
 
@@ -221,7 +245,7 @@ export default async function handler(request, response) {
 
       const { data: existing, error: findError } = await supabase
         .from('notes')
-        .select('id')
+        .select('id, owner_id')
         .eq('id', id)
         .maybeSingle();
 
@@ -232,10 +256,16 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOT_FOUND' });
       }
 
+      // 소유자가 본인인지 확인 (타인 메모 삭제 차단)
+      if (existing.owner_id !== verifiedUser.userId) {
+        return response.status(403).json({ error: 'FORBIDDEN' });
+      }
+
       const { error: deleteError } = await supabase
         .from('notes')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('owner_id', verifiedUser.userId);
 
       if (deleteError) {
         return response.status(500).json({ error: 'DATABASE_DELETE_ERROR', message: deleteError.message });
