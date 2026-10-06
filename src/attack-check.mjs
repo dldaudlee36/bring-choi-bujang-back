@@ -12,9 +12,9 @@ export async function runAttackChecks(config) {
       || app.pathname !== '/' || app.hostname.endsWith('.example')) {
     throw new Error('aleph.config.json의 실제 배포 주소를 먼저 넣어 주세요.');
   }
-  if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
 
   if (config.step === 1) {
+    if (typeof config.sampleMarker !== 'string' || !config.sampleMarker) throw new Error('가상 메모의 확인 표시를 넣어 주세요.');
     const response = await fetch(new URL('/data.json', app), {
       redirect: 'error', signal: AbortSignal.timeout(10000),
     });
@@ -34,23 +34,25 @@ export async function runAttackChecks(config) {
 
   const results = [];
 
-  // 점검 1: /data.json 정적 파일에서 메모가 제거되었는지
+  // 점검 1: /data.json 정적 파일에서 메모와 확인 표시가 제거되었는지
   const dataResponse = await fetch(new URL('/data.json', app), {
     redirect: 'error', signal: AbortSignal.timeout(10000),
   });
   let dataEmpty = false;
+  let hasMarker = false;
   if (dataResponse.ok) {
     try {
       const data = await dataResponse.json();
       dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
+      hasMarker = Boolean(data?.sampleMarker);
     } catch {
       // non-JSON
     }
   }
   results.push({
     attackId: 'anonymous_static_read',
-    expected: '비로그인 /data.json 요청에서 가상 메모가 노출되지 않음',
-    observed: dataEmpty ? '비로그인 /data.json 요청에서 가상 메모가 비어 있음 확인' : `비로그인 /data.json에서 가상 메모가 발견됨 (HTTP ${dataResponse.status})`,
+    expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
+    observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 모두 비어 있음 확인' : `비로그인 /data.json에서 메모 또는 확인 표시가 발견됨 (HTTP ${dataResponse.status})`,
   });
 
   // 점검 2: /api/notes 공개 서버 함수 호출 점검 (현재의 공개 주소 약점 점검)
