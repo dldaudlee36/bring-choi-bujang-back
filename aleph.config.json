@@ -10,7 +10,8 @@
     "jwksUrl": "https://mxiycelcxviyvsixuytr.supabase.co/auth/v1/.well-known/jwks.json"
   },
   "allowedRoutes": [
-    "/api/notes"
+    "/api/notes",
+    "/api/notes/:id"
   ],
   "originalApiUrl": null,
   "restoreRoute": null

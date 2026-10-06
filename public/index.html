@@ -17,8 +17,8 @@
     .auth-form { display: grid; gap: 14px; }
     .field { display: grid; gap: 6px; }
     .field label { font-size: 14px; color: #8ad8df; font-weight: 600; }
-    .field input { background: #0c1521; border: 1px solid #51667c; border-radius: 8px; padding: 10px 14px; color: #ecf4ff; font-size: 15px; }
-    .field input:focus { outline: 2px solid #8ad8df; border-color: transparent; }
+    .field input, .crud-form textarea { background: #0c1521; border: 1px solid #51667c; border-radius: 8px; padding: 10px 14px; color: #ecf4ff; font-size: 15px; }
+    .field input:focus, .crud-form textarea:focus { outline: 2px solid #8ad8df; border-color: transparent; }
     button { cursor: pointer; border-radius: 8px; border: none; font-size: 15px; font-weight: 600; padding: 10px 16px; transition: background 0.15s; }
     #login-button { background: #2563eb; color: #fff; margin-top: 6px; }
     #login-button:hover { background: #1d4ed8; }
@@ -28,15 +28,33 @@
     .user-profile { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
     .user-info { display: flex; flex-direction: column; gap: 4px; }
     .user-label { font-size: 13px; color: #8ad8df; }
+
+    /* CRUD 영역 스타일 */
+    .note-crud-section { margin: 24px 0; padding: 22px; border: 1px solid #51667c; border-radius: 14px; background: #152233; }
+    .note-crud-section h3 { margin: 0 0 14px; font-size: 18px; color: #ecf4ff; }
+    .crud-form { display: grid; gap: 12px; }
+    .crud-form textarea { font-family: inherit; resize: vertical; }
+    #create-note-btn { background: #059669; color: #fff; justify-self: start; }
+    #create-note-btn:hover { background: #047857; }
+    .crud-message { font-size: 14px; min-height: 18px; }
+
+    /* 메모 목록 스타일 */
     ul { list-style: none; display: grid; gap: 12px; padding: 0; }
-    li { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
+    .note-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
+    .note-content { flex: 1; min-width: 0; }
     strong { display: block; font-size: 18px; margin-bottom: 5px; }
-    li span { color: #bfd0e5; }
+    .note-content span { color: #bfd0e5; display: block; word-break: break-word; white-space: pre-wrap; }
+    .note-actions { display: flex; gap: 8px; flex-shrink: 0; }
+    .btn-edit { background: #3b82f6; color: #fff; font-size: 13px; padding: 7px 13px; }
+    .btn-edit:hover { background: #2563eb; }
+    .btn-delete { background: #dc2626; color: #fff; font-size: 13px; padding: 7px 13px; }
+    .btn-delete:hover { background: #b91c1c; }
+    .empty-item { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; color: #bfd0e5; }
   </style>
 </head>
 <body>
   <main>
-    <div class="eyebrow">BYTE BACK · 3단계 로그인</div>
+    <div class="eyebrow">BYTE BACK · 3단계 로그인 및 메모 관리</div>
     <h1>점령된 자료실</h1>
     <p>지금은 보호 장치가 없는 상태입니다. 아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
 
@@ -64,9 +82,27 @@
       </div>
     </section>
 
-    <div class="notice">로그인하지 않은 방문자도 자료를 볼 수 있습니다. 공개 범위를 확인하고, 다음 제작 단계에서 접근을 차례로 막아 주세요.</div>
-    <ul id="notes" aria-live="polite"><li>가상 자료를 불러오는 중입니다.</li></ul>
+    <!-- 메모 추가 영역 (로그인 시 표시) -->
+    <section id="note-crud-section" class="note-crud-section" style="display: none;" aria-label="메모 관리">
+      <h3>새 가상 메모 추가</h3>
+      <form id="create-note-form" class="crud-form">
+        <div class="field">
+          <label for="new-note-title">메모 제목</label>
+          <input type="text" id="new-note-title" required placeholder="메모 제목을 입력하세요">
+        </div>
+        <div class="field">
+          <label for="new-note-body">메모 본문</label>
+          <textarea id="new-note-body" rows="3" required placeholder="메모 본문 내용을 입력하세요"></textarea>
+        </div>
+        <button type="submit" id="create-note-btn">메모 추가</button>
+        <div id="crud-message" class="crud-message" role="status"></div>
+      </form>
+    </section>
+
+    <div class="notice">로그인하지 않은 방문자에게는 자료가 숨겨지며, 승인된 사용자만 메모를 추가·수정·삭제할 수 있습니다.</div>
+    <ul id="notes" aria-live="polite"><li class="empty-item">로그인 후 자료를 확인할 수 있습니다.</li></ul>
   </main>
+
   <script type="module">
     import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
@@ -74,6 +110,8 @@
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXljZWxjeHZpeXZzaXh1eXRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMzMyNjksImV4cCI6MjEwNjgwOTI2OX0.5HwJj0sdBYp0U0pdcwXcjfZoE5Z_vYMYU55ll33SP-c';
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentToken = null;
 
     const loginForm = document.querySelector('#login-form');
     const userProfile = document.querySelector('#user-profile');
@@ -83,6 +121,10 @@
     const userEmail = document.querySelector('#user-email');
     const logoutButton = document.querySelector('#logout-button');
     const loginButton = document.querySelector('#login-button');
+    const crudSection = document.querySelector('#note-crud-section');
+    const createNoteForm = document.querySelector('#create-note-form');
+    const crudMessage = document.querySelector('#crud-message');
+    const list = document.querySelector('#notes');
 
     function clearInputs() {
       emailInput.value = '';
@@ -96,16 +138,19 @@
       }, 50);
     }
 
-    function renderAuthState(user) {
+    function renderAuthState(user, token) {
+      currentToken = token;
       if (user) {
         loginForm.style.display = 'none';
         userProfile.style.display = 'flex';
         userEmail.textContent = user.email || '(이메일 정보 없음)';
         authError.textContent = '';
+        crudSection.style.display = 'block';
       } else {
         loginForm.style.display = 'grid';
         userProfile.style.display = 'none';
         userEmail.textContent = '';
+        crudSection.style.display = 'none';
         clearInputs();
       }
     }
@@ -125,7 +170,8 @@
           authError.textContent = `로그인 실패: ${error.message}`;
         } else {
           clearInputs();
-          renderAuthState(data.user);
+          renderAuthState(data.user, data.session?.access_token ?? null);
+          loadNotes(data.session?.access_token ?? null);
         }
       } catch (err) {
         authError.textContent = `오류 발생: ${err.message}`;
@@ -143,7 +189,8 @@
           alert(`로그아웃 실패: ${error.message}`);
         } else {
           clearInputs();
-          renderAuthState(null);
+          renderAuthState(null, null);
+          loadNotes(null);
         }
       } catch (err) {
         alert(`로그아웃 오류: ${err.message}`);
@@ -152,11 +199,49 @@
       }
     });
 
-    const list = document.querySelector('#notes');
+    // 메모 추가 제출
+    createNoteForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentToken) return;
+
+      const titleInput = document.querySelector('#new-note-title');
+      const bodyInput = document.querySelector('#new-note-body');
+      const title = titleInput.value.trim();
+      const body = bodyInput.value.trim();
+
+      crudMessage.textContent = '메모를 추가하는 중...';
+      crudMessage.style.color = '#8ad8df';
+
+      try {
+        const response = await fetch('/api/notes', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ title, body })
+        });
+
+        if (!response.ok) {
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.message || '메모 추가에 실패했습니다.');
+        }
+
+        createNoteForm.reset();
+        crudMessage.textContent = '메모가 성공적으로 추가되었습니다.';
+        crudMessage.style.color = '#4ade80';
+        setTimeout(() => { crudMessage.textContent = ''; }, 3000);
+        await loadNotes(currentToken);
+      } catch (err) {
+        crudMessage.textContent = `추가 오류: ${err.message}`;
+        crudMessage.style.color = '#f87171';
+      }
+    });
 
     async function loadNotes(token) {
       if (!token) {
         const item = document.createElement('li');
+        item.className = 'empty-item';
         item.textContent = '로그인 후 자료를 확인할 수 있습니다.';
         list.replaceChildren(item);
         return;
@@ -173,26 +258,94 @@
           throw new Error('자료를 불러올 수 없습니다 (인증 거부).');
         }
         const data = await response.json();
-        if (!Array.isArray(data.notes)) {
-          throw new Error('자료 형식이 맞지 않습니다.');
-        }
-        if (data.notes.length === 0) {
+        const notes = Array.isArray(data) ? data : (data.notes || []);
+
+        if (notes.length === 0) {
           const item = document.createElement('li');
-          item.textContent = '보관된 자료가 없습니다.';
+          item.className = 'empty-item';
+          item.textContent = '보관된 메모가 없습니다.';
           list.replaceChildren(item);
           return;
         }
-        list.replaceChildren(...data.notes.map(note => {
+
+        list.replaceChildren(...notes.map(note => {
           const item = document.createElement('li');
+          item.className = 'note-item';
+          item.dataset.id = note.id;
+
+          const contentBox = document.createElement('div');
+          contentBox.className = 'note-content';
           const title = document.createElement('strong');
-          const content = document.createElement('span');
+          const body = document.createElement('span');
           title.textContent = note.title;
-          content.textContent = note.content;
-          item.append(title, content);
+          body.textContent = note.body ?? note.content ?? '';
+          contentBox.append(title, body);
+
+          const actionsBox = document.createElement('div');
+          actionsBox.className = 'note-actions';
+
+          // 수정 버튼
+          const editBtn = document.createElement('button');
+          editBtn.type = 'button';
+          editBtn.className = 'btn-edit';
+          editBtn.textContent = '수정';
+          editBtn.addEventListener('click', async () => {
+            const newTitle = prompt('수정할 메모 제목을 입력하세요:', note.title);
+            if (newTitle === null) return;
+            const newBody = prompt('수정할 메모 본문을 입력하세요:', note.body ?? note.content ?? '');
+            if (newBody === null) return;
+
+            try {
+              const putRes = await fetch(`/api/notes/${encodeURIComponent(note.id)}`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${currentToken}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ title: newTitle, body: newBody })
+              });
+              if (!putRes.ok) {
+                const errData = await putRes.json().catch(() => ({}));
+                throw new Error(errData.message || '메모 수정 실패');
+              }
+              await loadNotes(currentToken);
+            } catch (err) {
+              alert(`수정 오류: ${err.message}`);
+            }
+          });
+
+          // 삭제 버튼
+          const deleteBtn = document.createElement('button');
+          deleteBtn.type = 'button';
+          deleteBtn.className = 'btn-delete';
+          deleteBtn.textContent = '삭제';
+          deleteBtn.addEventListener('click', async () => {
+            if (!confirm(`'${note.title}' 메모를 삭제하시겠습니까?`)) return;
+
+            try {
+              const delRes = await fetch(`/api/notes/${encodeURIComponent(note.id)}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${currentToken}`
+                }
+              });
+              if (!delRes.ok) {
+                const errData = await delRes.json().catch(() => ({}));
+                throw new Error(errData.message || '메모 삭제 실패');
+              }
+              await loadNotes(currentToken);
+            } catch (err) {
+              alert(`삭제 오류: ${err.message}`);
+            }
+          });
+
+          actionsBox.append(editBtn, deleteBtn);
+          item.append(contentBox, actionsBox);
           return item;
         }));
       } catch (error) {
         const item = document.createElement('li');
+        item.className = 'empty-item';
         item.textContent = error.message;
         list.replaceChildren(item);
       }
@@ -200,11 +353,11 @@
 
     // 세션 초기화 및 변경 감지
     const { data: { session } } = await supabase.auth.getSession();
-    renderAuthState(session?.user ?? null);
+    renderAuthState(session?.user ?? null, session?.access_token ?? null);
     loadNotes(session?.access_token ?? null);
 
     supabase.auth.onAuthStateChange((_event, session) => {
-      renderAuthState(session?.user ?? null);
+      renderAuthState(session?.user ?? null, session?.access_token ?? null);
       loadNotes(session?.access_token ?? null);
     });
   </script>
