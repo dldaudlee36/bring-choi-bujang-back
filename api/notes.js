@@ -144,14 +144,21 @@ export default async function handler(request, response) {
       }
 
       const noteId = body.id?.trim() || randomUUID();
-      const insertData = {
+      let insertData = {
         id: noteId,
         title,
         body: noteBody,
         owner_id: verifiedUser.userId,
       };
 
-      const { error } = await supabase.from('notes').insert([insertData]);
+      let { error } = await supabase.from('notes').insert([insertData]);
+      if (error && error.message?.includes("'body' column")) {
+        delete insertData.body;
+        insertData.content = noteBody;
+        const retry = await supabase.from('notes').insert([insertData]);
+        error = retry.error;
+      }
+
       if (error) {
         return response.status(500).json({ error: 'DATABASE_INSERT_ERROR', message: error.message });
       }
@@ -182,15 +189,22 @@ export default async function handler(request, response) {
       const title = body.title !== undefined ? body.title : existing.title;
       const noteBody = body.body !== undefined ? body.body : (existing.body ?? existing.content ?? '');
 
-      const updateData = {
+      let updateData = {
         title,
         body: noteBody,
       };
 
-      const { error: updateError } = await supabase
+      let { error: updateError } = await supabase
         .from('notes')
         .update(updateData)
         .eq('id', id);
+
+      if (updateError && updateError.message?.includes("'body' column")) {
+        delete updateData.body;
+        updateData.content = noteBody;
+        const retry = await supabase.from('notes').update(updateData).eq('id', id);
+        updateError = retry.error;
+      }
 
       if (updateError) {
         return response.status(500).json({ error: 'DATABASE_UPDATE_ERROR', message: updateError.message });
