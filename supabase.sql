@@ -1,16 +1,17 @@
--- 4단계: notes 테이블 최소 권한(GRANT/REVOKE) 및 RLS 정책
+-- 5단계: notes 테이블의 PUBLIC, anon, authenticated 직접 접근 권한 전면 회수
+-- (브라우저나 외부 클라이언트의 원본 Supabase REST API 직접 호출 차단, Vercel 서버 함수의 service_role만 허용)
 
 -- ==============================================================================
--- [1] 적용 전 권한 상태 점검 (SQL Editor에서 먼저 실행해 볼 수 있습니다)
+-- [1] 적용 전 권한 상태 점검 (현재 상태 확인)
 -- ==============================================================================
--- 1-1) role_table_grants 점검
+-- 1-1) role_table_grants 확인 (현재 authenticated에 부여된 권한 확인)
 SELECT grantee, table_name, privilege_type
 FROM information_schema.role_table_grants
 WHERE table_name = 'notes'
   AND grantee IN ('anon', 'authenticated')
 ORDER BY grantee, privilege_type;
 
--- 1-2) has_table_privilege 점검
+-- 1-2) has_table_privilege 확인
 SELECT
   r.role,
   p.privilege,
@@ -21,63 +22,30 @@ ORDER BY r.role, p.privilege;
 
 
 -- ==============================================================================
--- [2] 권한 회수 및 최소 권한 부여
+-- [2] PUBLIC, anon, authenticated의 모든 직접 권한 전면 회수
 -- ==============================================================================
--- PUBLIC, anon, authenticated의 모든 기존 권한 회수
+-- notes 테이블에 대한 PUBLIC, anon, authenticated 역할의 모든 권한을 회수하여 직접 Data API 접근 차단
 REVOKE ALL ON TABLE notes FROM PUBLIC, anon, authenticated;
 
--- authenticated 역할에 대해서만 SELECT, INSERT, UPDATE, DELETE 권한 부여
-GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE notes TO authenticated;
-
-
--- ==============================================================================
--- [3] Row Level Security (RLS) 활성화 및 본인 행 한정 정책 설정
--- ==============================================================================
+-- RLS 활성화 상태 유지 및 기존 RLS 정책 정리 (테이블 권한 자체가 없으므로 거부됨)
 ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
-
--- 기존 정책이 있다면 정리
 DROP POLICY IF EXISTS "notes_select_own" ON notes;
 DROP POLICY IF EXISTS "notes_insert_own" ON notes;
 DROP POLICY IF EXISTS "notes_update_own" ON notes;
 DROP POLICY IF EXISTS "notes_delete_own" ON notes;
 
--- SELECT 정책: auth.uid() = owner_id일 때만 조회 허용 (기존 행 USING)
-CREATE POLICY "notes_select_own" ON notes
-  FOR SELECT
-  TO authenticated
-  USING (auth.uid() = owner_id);
-
--- INSERT 정책: auth.uid() = owner_id일 때만 추가 허용 (새 행 WITH CHECK)
-CREATE POLICY "notes_insert_own" ON notes
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (auth.uid() = owner_id);
-
--- UPDATE 정책: auth.uid() = owner_id일 때만 수정 허용 (기존 행 USING + 새 행 WITH CHECK)
-CREATE POLICY "notes_update_own" ON notes
-  FOR UPDATE
-  TO authenticated
-  USING (auth.uid() = owner_id)
-  WITH CHECK (auth.uid() = owner_id);
-
--- DELETE 정책: auth.uid() = owner_id일 때만 삭제 허용 (기존 행 USING)
-CREATE POLICY "notes_delete_own" ON notes
-  FOR DELETE
-  TO authenticated
-  USING (auth.uid() = owner_id);
-
 
 -- ==============================================================================
--- [4] 적용 후 권한 상태 점검 (적용 후 확인용)
+-- [3] 적용 후 권한 상태 점검 (모든 권한 회수 확인)
 -- ==============================================================================
--- 4-1) role_table_grants 확인
+-- 3-1) role_table_grants 확인 (anon, authenticated 모두 0건이어야 함)
 SELECT grantee, table_name, privilege_type
 FROM information_schema.role_table_grants
 WHERE table_name = 'notes'
   AND grantee IN ('anon', 'authenticated')
 ORDER BY grantee, privilege_type;
 
--- 4-2) has_table_privilege 확인
+-- 3-2) has_table_privilege 확인 (anon, authenticated 모두 8개 항목 전부 false여야 함)
 SELECT
   r.role,
   p.privilege,
