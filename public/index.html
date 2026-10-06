@@ -42,14 +42,14 @@
 
     <section id="auth-panel" class="auth-panel" aria-label="사용자 인증">
       <h2>자료실 출입 인증</h2>
-      <form id="login-form" class="auth-form">
+      <form id="login-form" class="auth-form" autocomplete="off">
         <div class="field">
           <label for="email">이메일</label>
-          <input type="email" id="email" required autocomplete="email" placeholder="user@example.com">
+          <input type="email" id="email" required autocomplete="off" placeholder="user@example.com">
         </div>
         <div class="field">
           <label for="password">비밀번호</label>
-          <input type="password" id="password" required autocomplete="current-password" placeholder="비밀번호">
+          <input type="password" id="password" required autocomplete="new-password" placeholder="비밀번호">
         </div>
         <button type="submit" id="login-button">로그인</button>
         <div id="auth-error" class="auth-error" role="alert" aria-live="assertive"></div>
@@ -84,6 +84,18 @@
     const logoutButton = document.querySelector('#logout-button');
     const loginButton = document.querySelector('#login-button');
 
+    function clearInputs() {
+      emailInput.value = '';
+      passwordInput.value = '';
+      emailInput.defaultValue = '';
+      passwordInput.defaultValue = '';
+      loginForm.reset();
+      setTimeout(() => {
+        emailInput.value = '';
+        passwordInput.value = '';
+      }, 50);
+    }
+
     function renderAuthState(user) {
       if (user) {
         loginForm.style.display = 'none';
@@ -94,7 +106,7 @@
         loginForm.style.display = 'grid';
         userProfile.style.display = 'none';
         userEmail.textContent = '';
-        loginForm.reset();
+        clearInputs();
       }
     }
 
@@ -112,7 +124,7 @@
         if (error) {
           authError.textContent = `로그인 실패: ${error.message}`;
         } else {
-          loginForm.reset();
+          clearInputs();
           renderAuthState(data.user);
         }
       } catch (err) {
@@ -130,6 +142,7 @@
         if (error) {
           alert(`로그아웃 실패: ${error.message}`);
         } else {
+          clearInputs();
           renderAuthState(null);
         }
       } catch (err) {
