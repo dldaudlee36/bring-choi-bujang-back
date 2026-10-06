@@ -94,6 +94,7 @@
         loginForm.style.display = 'grid';
         userProfile.style.display = 'none';
         userEmail.textContent = '';
+        loginForm.reset();
       }
     }
 
@@ -111,7 +112,7 @@
         if (error) {
           authError.textContent = `로그인 실패: ${error.message}`;
         } else {
-          passwordInput.value = '';
+          loginForm.reset();
           renderAuthState(data.user);
         }
       } catch (err) {
