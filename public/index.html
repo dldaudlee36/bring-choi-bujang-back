@@ -104,13 +104,6 @@
   </main>
 
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-    const SUPABASE_URL = 'https://mxiycelcxviyvsixuytr.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im14aXljZWxjeHZpeXZzaXh1eXRyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyMzMyNjksImV4cCI6MjEwNjgwOTI2OX0.5HwJj0sdBYp0U0pdcwXcjfZoE5Z_vYMYU55ll33SP-c';
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
     let currentToken = null;
 
     const loginForm = document.querySelector('#login-form');
@@ -165,13 +158,20 @@
       const password = passwordInput.value;
 
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          authError.textContent = `로그인 실패: ${error.message}`;
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          authError.textContent = `로그인 실패: ${data.error || '이메일 또는 비밀번호가 올바르지 않습니다.'}`;
         } else {
           clearInputs();
-          renderAuthState(data.user, data.session?.access_token ?? null);
-          loadNotes(data.session?.access_token ?? null);
+          sessionStorage.setItem('session_token', data.access_token);
+          sessionStorage.setItem('session_user', JSON.stringify(data.user));
+          renderAuthState(data.user, data.access_token);
+          loadNotes(data.access_token);
         }
       } catch (err) {
         authError.textContent = `오류 발생: ${err.message}`;
@@ -181,22 +181,12 @@
       }
     });
 
-    logoutButton.addEventListener('click', async () => {
-      logoutButton.disabled = true;
-      try {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-          alert(`로그아웃 실패: ${error.message}`);
-        } else {
-          clearInputs();
-          renderAuthState(null, null);
-          loadNotes(null);
-        }
-      } catch (err) {
-        alert(`로그아웃 오류: ${err.message}`);
-      } finally {
-        logoutButton.disabled = false;
-      }
+    logoutButton.addEventListener('click', () => {
+      sessionStorage.removeItem('session_token');
+      sessionStorage.removeItem('session_user');
+      clearInputs();
+      renderAuthState(null, null);
+      loadNotes(null);
     });
 
     // 메모 추가 제출
@@ -351,15 +341,16 @@
       }
     }
 
-    // 세션 초기화 및 변경 감지
-    const { data: { session } } = await supabase.auth.getSession();
-    renderAuthState(session?.user ?? null, session?.access_token ?? null);
-    loadNotes(session?.access_token ?? null);
-
-    supabase.auth.onAuthStateChange((_event, session) => {
-      renderAuthState(session?.user ?? null, session?.access_token ?? null);
-      loadNotes(session?.access_token ?? null);
-    });
+    // 세션 초기화
+    let initialToken = sessionStorage.getItem('session_token');
+    let initialUser = null;
+    try {
+      initialUser = JSON.parse(sessionStorage.getItem('session_user') || 'null');
+    } catch {
+      initialUser = null;
+    }
+    renderAuthState(initialUser, initialToken);
+    loadNotes(initialToken);
   </script>
 </body>
 </html>
