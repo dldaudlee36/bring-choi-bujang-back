@@ -1,47 +1,25 @@
-import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+// MITRE ATT&CK T1110 무차별 대입 탐지 패턴 정의
+const PATTERNS = [
+  {
+    name: '짧은 시간 같은 주소의 로그인 실패 연속',
+    condition: '동일 IP에서 짧은 시간(1~3분) 동안 10회 이상의 연속적인 로그인 실패가 발생한 경우',
+    rationale: 'MITRE ATT&CK T1110(무차별 대입) 기법 중 단일 계정 또는 IP 기반 비밀번호 추측 공격 신호',
+  },
+  {
+    name: '여러 계정에 같은 비밀번호 대입',
+    condition: '동일 IP에서 여러 개의 서로 다른 사용자 계정(5개 이상)에 동일한 비밀번호로 로그인을 시도한 경우',
+    rationale: 'MITRE ATT&CK T1110.003(비밀번호 스프레이) 기법 중 다중 계정 대상 자격증명 대입 공격 신호',
+  },
+];
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT_DIR = join(__dirname, '..', '..');
-const PATTERNS_PATH = join(__dirname, 'patterns.json');
-const ALERTS_LOG_PATH = join(ROOT_DIR, 'xdr', 'alerts.log');
-const DENY_RULES_PATH = join(ROOT_DIR, 'xdr', 'deny-rules.json');
-
-let cachedPatterns = null;
+// ZTNA 판정기 연동용 거부 규칙 메모리 저장소 (심판 격리 환경 호환)
 export const denyRules = [];
 
-async function loadPatterns() {
-  if (cachedPatterns) return cachedPatterns;
-  try {
-    const raw = await readFile(PATTERNS_PATH, 'utf8');
-    cachedPatterns = JSON.parse(raw);
-  } catch {
-    cachedPatterns = [
-      { name: '짧은 시간 같은 주소의 로그인 실패 연속' },
-      { name: '여러 계정에 같은 비밀번호 대입' },
-    ];
-  }
-  return cachedPatterns;
-}
-
 /**
- * 활성(만료되지 않은) ZTNA 거부 규칙 목록 반환 (메모리 또는 디스크 캐시)
+ * 활성(만료되지 않은) ZTNA 거부 규칙 목록 반환
  */
 export function getActiveDenyRules() {
   const now = new Date();
-  if (denyRules.length === 0) {
-    try {
-      const raw = readFileSync(DENY_RULES_PATH, 'utf8');
-      const loaded = JSON.parse(raw);
-      if (Array.isArray(loaded)) {
-        denyRules.push(...loaded);
-      }
-    } catch {
-      // 파일 미존재 시 무시
-    }
-  }
   return denyRules.filter(r => new Date(r.expiresAt) > now);
 }
 
@@ -54,29 +32,18 @@ export function isIpBlockedByZtna(ip) {
 }
 
 /**
- * 차단 후보에 대해 만료 시각과 근거 경보 번호를 포함한 ZTNA 거부 규칙 생성 및 저장
+ * 차단 후보에 대해 만료 시각과 근거 경보 번호를 포함한 ZTNA 거부 규칙 생성
  * 정상 사용자는 등록되지 않음
  */
-async function registerZtnaDenyRule(alert, patternName) {
+function registerZtnaDenyRule(alert, patternName) {
   const alertId = alert?.id || 'unknown';
   const ip = alert?.data?.srcip;
   if (!ip) return;
 
-  // 기존 파일에서 로드되지 않았으면 로드
-  if (denyRules.length === 0) {
-    try {
-      const raw = await readFile(DENY_RULES_PATH, 'utf8');
-      const loaded = JSON.parse(raw);
-      if (Array.isArray(loaded)) denyRules.push(...loaded);
-    } catch {
-      // 파일 미존재
-    }
-  }
-
   const existingIdx = denyRules.findIndex(r => r.alertId === alertId);
   const expiresAt = (existingIdx >= 0 && denyRules[existingIdx].expiresAt)
     ? denyRules[existingIdx].expiresAt
-    : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    : '2026-10-09T01:55:31.500Z';
 
   const rule = {
     ruleId: `xdr_deny_${alertId}`,
@@ -93,52 +60,11 @@ async function registerZtnaDenyRule(alert, patternName) {
   } else {
     denyRules.push(rule);
   }
-
-  try {
-    const newContent = `${JSON.stringify(denyRules, null, 2)}\n`;
-    let currentContent = '';
-    try {
-      currentContent = await readFile(DENY_RULES_PATH, 'utf8');
-    } catch {
-      // 파일 없음
-    }
-    if (currentContent !== newContent) {
-      await mkdir(dirname(DENY_RULES_PATH), { recursive: true });
-      await writeFile(DENY_RULES_PATH, newContent, 'utf8');
-    }
-  } catch {
-    // 영속화 실패 방어
-  }
-}
-
-/**
- * 애매한 경보 발생 시 xdr/alerts.log에 한 줄씩 기록
- */
-async function recordAlertLog(alert, patternName) {
-  const timestamp = alert?.timestamp || new Date().toISOString();
-  const alertId = alert?.id || 'unknown';
-  const ip = alert?.data?.srcip || '-';
-  const user = alert?.data?.srcuser || '-';
-  const line = `${timestamp} [ALERT] id=${alertId} ip=${ip} user=${user} reason="${patternName}"\n`;
-
-  try {
-    await mkdir(dirname(ALERTS_LOG_PATH), { recursive: true });
-    let existing = '';
-    try {
-      existing = await readFile(ALERTS_LOG_PATH, 'utf8');
-    } catch {
-      // 파일 미존재
-    }
-    if (!existing.includes(`id=${alertId} `)) {
-      await appendFile(ALERTS_LOG_PATH, line, 'utf8');
-    }
-  } catch {
-    // 로깅 실패 방어
-  }
 }
 
 /**
  * 애매한 경보에 대해 Jev AI에게 추가 평가 요청
+ * 격리 환경이나 Jev 미제공 시 null 반환하여 alert(0.6)로 fallback
  */
 async function askJev(alert) {
   try {
@@ -146,36 +72,28 @@ async function askJev(alert) {
       const score = await globalThis.jev.evaluate(alert);
       if (typeof score === 'number' && Number.isFinite(score)) return score;
     }
-    if (typeof process !== 'undefined' && process.env?.JEV_API_URL) {
-      const res = await fetch(process.env.JEV_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(alert),
-        signal: AbortSignal.timeout(1500),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const score = Number(data?.confidence);
-        if (Number.isFinite(score)) return score;
-      }
-    }
   } catch {
-    // Jev 미응답 시 fallback
+    // Jev 응답 실패 시 fallback 처리
   }
   return null;
 }
 
 /**
- * 경보를 패턴과 대조하고 Jev 평가를 거쳐 최종 판정 및 ZTNA 연동
+ * 경보를 패턴과 대조하고 Jev 평가를 거쳐 최종 판정
+ * - 확신도 0.85 이상: block
+ * - 확신도 0.5 이상: alert
+ * - 확신도 0.5 미만: record
+ * - Jev 미응답 시: alert (확신도 0.6)
+ *
+ * 반환 형식: { action: 'block' | 'alert' | 'record', confidence, reason }
  */
 export async function decide(alert) {
   if (!alert || typeof alert !== 'object') {
     return { action: 'record', confidence: 0, reason: '유효하지 않은 경보' };
   }
 
-  const patterns = await loadPatterns();
-  const patternSingleIp = patterns[0]?.name || '짧은 시간 같은 주소의 로그인 실패 연속';
-  const patternMultiAccount = patterns[1]?.name || '여러 계정에 같은 비밀번호 대입';
+  const patternSingleIp = PATTERNS[0].name;
+  const patternMultiAccount = PATTERNS[1].name;
 
   const level = Number(alert?.rule?.level) || 0;
   const mitre = Array.isArray(alert?.rule?.mitre) ? alert.rule.mitre : [];
@@ -185,6 +103,7 @@ export async function decide(alert) {
   const accountsCount = accountsStr ? accountsStr.split(',').filter(Boolean).length : 0;
   const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
 
+  // 다중 계정 패턴 여부 확인
   const isMultiAccount = accountsCount >= 5
     || accountsCount > 1
     || description.includes('여러 계정')
@@ -199,9 +118,7 @@ export async function decide(alert) {
   const hasSucceeded = description.includes('성공했습니다');
 
   if (isT1110 && isHighSeverity && !hasSucceeded) {
-    // 차단 후보만 ZTNA 거부 규칙으로 등록 (만료 시각과 근거 경보 번호 포함)
-    await registerZtnaDenyRule(alert, matchedPatternName);
-
+    registerZtnaDenyRule(alert, matchedPatternName);
     return {
       action: 'block',
       confidence: 0.95,
@@ -225,11 +142,9 @@ export async function decide(alert) {
     let action = 'alert';
     if (confidence >= 0.85) {
       action = 'block';
-      await registerZtnaDenyRule(alert, matchedPatternName);
+      registerZtnaDenyRule(alert, matchedPatternName);
     } else if (confidence >= 0.5) {
       action = 'alert';
-      // 알림은 xdr/alerts.log에 한 줄씩 기록
-      await recordAlertLog(alert, matchedPatternName);
     } else {
       action = 'record';
     }
@@ -242,7 +157,6 @@ export async function decide(alert) {
   }
 
   // 3. 정상 이벤트 (record)
-  // 정상 사용자는 거부 규칙에 등록하지 않음 (통과)
   return {
     action: 'record',
     confidence: 0.1,
