@@ -1,0 +1,92 @@
+[
+  {
+    "ruleId": "xdr_deny_bf-01",
+    "alertId": "bf-01",
+    "ip": "203.0.113.10",
+    "user": "user01",
+    "expiresAt": "2026-10-09T01:32:08.038Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-02",
+    "alertId": "bf-02",
+    "ip": "203.0.113.10",
+    "user": "user01",
+    "expiresAt": "2026-10-09T01:32:08.040Z",
+    "reason": "여러 계정에 같은 비밀번호 대입",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-03",
+    "alertId": "bf-03",
+    "ip": "198.51.100.20",
+    "user": "user02",
+    "expiresAt": "2026-10-09T01:32:08.041Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-04",
+    "alertId": "bf-04",
+    "ip": "192.0.2.30",
+    "user": "user02",
+    "expiresAt": "2026-10-09T01:32:08.041Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-05",
+    "alertId": "bf-05",
+    "ip": "203.0.113.21",
+    "user": "user03",
+    "expiresAt": "2026-10-09T01:32:08.042Z",
+    "reason": "여러 계정에 같은 비밀번호 대입",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-06",
+    "alertId": "bf-06",
+    "ip": "198.51.100.44",
+    "user": "user03",
+    "expiresAt": "2026-10-09T01:32:08.042Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-07",
+    "alertId": "bf-07",
+    "ip": "203.0.113.15",
+    "user": "user04",
+    "expiresAt": "2026-10-09T01:32:08.043Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-08",
+    "alertId": "bf-08",
+    "ip": "192.0.2.18",
+    "user": "user05",
+    "expiresAt": "2026-10-09T01:32:08.043Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-09",
+    "alertId": "bf-09",
+    "ip": "198.51.100.8",
+    "user": "user06",
+    "expiresAt": "2026-10-09T01:32:08.044Z",
+    "reason": "여러 계정에 같은 비밀번호 대입",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_bf-10",
+    "alertId": "bf-10",
+    "ip": "203.0.113.40",
+    "user": "user06",
+    "expiresAt": "2026-10-09T01:32:08.045Z",
+    "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
+    "action": "deny"
+  }
+]

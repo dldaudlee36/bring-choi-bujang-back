@@ -44,7 +44,7 @@
    npm run bundle
    ```
 4. **배포 사이트 확인**:
-   - 배포 주소: https://choi-bujang-secret-vault-6asl.vercel.app
+   - 배포 주소: https://rescue-choi-bujang-pc.vercel.app
    - 로그인하지 않은 창에서는 자료가 노출되지 않습니다.
    - 사용자 A/B 각자 로그인 시 본인의 메모만 CRUD가 정상 수행됩니다.
    - 원본 Supabase API로 직접 요청 시 차단됩니다.

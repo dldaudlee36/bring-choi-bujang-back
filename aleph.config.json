@@ -1,7 +1,7 @@
 {
   "step": 5,
-  "repoUrl": "https://github.com/dldaudlee36/choi-bujang-secret-vault",
-  "publicAppUrl": "https://choi-bujang-secret-vault-6asl.vercel.app",
+  "repoUrl": "https://github.com/dldaudlee36/bring-choi-bujang-back",
+  "publicAppUrl": "https://rescue-choi-bujang-pc.vercel.app",
   "sampleMarker": null,
   "judgeIssuer": "https://aleph-judge-production.up.railway.app/defense/judge",
   "identityProvider": {

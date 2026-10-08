@@ -1,10 +1,16 @@
-import { readFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PATTERNS_PATH = join(dirname(fileURLToPath(import.meta.url)), 'patterns.json');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT_DIR = join(__dirname, '..', '..');
+const PATTERNS_PATH = join(__dirname, 'patterns.json');
+const ALERTS_LOG_PATH = join(ROOT_DIR, 'xdr', 'alerts.log');
+const DENY_RULES_PATH = join(ROOT_DIR, 'xdr', 'deny-rules.json');
 
 let cachedPatterns = null;
+export const denyRules = [];
 
 async function loadPatterns() {
   if (cachedPatterns) return cachedPatterns;
@@ -21,8 +27,89 @@ async function loadPatterns() {
 }
 
 /**
+ * 활성(만료되지 않은) ZTNA 거부 규칙 목록 반환 (메모리 또는 디스크 캐시)
+ */
+export function getActiveDenyRules() {
+  const now = new Date();
+  if (denyRules.length === 0) {
+    try {
+      const raw = readFileSync(DENY_RULES_PATH, 'utf8');
+      const loaded = JSON.parse(raw);
+      if (Array.isArray(loaded)) {
+        denyRules.push(...loaded);
+      }
+    } catch {
+      // 파일 미존재 시 무시
+    }
+  }
+  return denyRules.filter(r => new Date(r.expiresAt) > now);
+}
+
+/**
+ * 특정 IP가 거부 규칙에 등록되어 있는지 확인
+ */
+export function isIpBlockedByZtna(ip) {
+  if (!ip) return false;
+  return getActiveDenyRules().some(r => r.ip === ip);
+}
+
+/**
+ * 차단 후보에 대해 만료 시각과 근거 경보 번호를 포함한 ZTNA 거부 규칙 생성 및 저장
+ * 정상 사용자는 등록되지 않음
+ */
+async function registerZtnaDenyRule(alert, patternName) {
+  const alertId = alert?.id || 'unknown';
+  const ip = alert?.data?.srcip;
+  if (!ip) return;
+
+  // 만료 시각: 24시간 뒤
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  const rule = {
+    ruleId: `xdr_deny_${alertId}`,
+    alertId,
+    ip,
+    user: alert?.data?.srcuser || null,
+    expiresAt,
+    reason: patternName,
+    action: 'deny',
+  };
+
+  const existingIdx = denyRules.findIndex(r => r.alertId === alertId);
+  if (existingIdx >= 0) {
+    denyRules[existingIdx] = rule;
+  } else {
+    denyRules.push(rule);
+  }
+
+  try {
+    await mkdir(dirname(DENY_RULES_PATH), { recursive: true });
+    await writeFile(DENY_RULES_PATH, `${JSON.stringify(denyRules, null, 2)}\n`, 'utf8');
+  } catch {
+    // 영속화 실패 방어
+  }
+}
+
+/**
+ * 애매한 경보 발생 시 xdr/alerts.log에 한 줄씩 기록
+ */
+async function recordAlertLog(alert, patternName) {
+  const timestamp = alert?.timestamp || new Date().toISOString();
+  const alertId = alert?.id || 'unknown';
+  const ip = alert?.data?.srcip || '-';
+  const user = alert?.data?.srcuser || '-';
+  const line = `${timestamp} [ALERT] id=${alertId} ip=${ip} user=${user} reason="${patternName}"\n`;
+
+  try {
+    await mkdir(dirname(ALERTS_LOG_PATH), { recursive: true });
+    await appendFile(ALERTS_LOG_PATH, line, 'utf8');
+  } catch {
+    // 로깅 실패 방어
+  }
+}
+
+/**
  * 애매한 경보에 대해 Jev AI에게 추가 평가 요청
- * Jev가 응답하지 않거나 설정되지 않은 경우 null을 반환하여 기본 alert로 떨어지도록 함
  */
 async function askJev(alert) {
   try {
@@ -44,17 +131,13 @@ async function askJev(alert) {
       }
     }
   } catch {
-    // Jev 응답 실패 시 fallback 처리
+    // Jev 미응답 시 fallback
   }
   return null;
 }
 
 /**
- * 경보를 패턴과 대조하고 Jev 평가를 거쳐 최종 판정
- * - 확신도 0.85 이상: block
- * - 확신도 0.5 이상: alert
- * - 확신도 0.5 미만: record
- * - Jev 미응답 시: alert (확신도 0.6)
+ * 경보를 패턴과 대조하고 Jev 평가를 거쳐 최종 판정 및 ZTNA 연동
  */
 export async function decide(alert) {
   if (!alert || typeof alert !== 'object') {
@@ -73,7 +156,6 @@ export async function decide(alert) {
   const accountsCount = accountsStr ? accountsStr.split(',').filter(Boolean).length : 0;
   const description = typeof alert?.rule?.description === 'string' ? alert.rule.description : '';
 
-  // 다중 계정 패턴 여부 확인
   const isMultiAccount = accountsCount >= 5
     || accountsCount > 1
     || description.includes('여러 계정')
@@ -84,22 +166,21 @@ export async function decide(alert) {
   const matchedPatternName = isMultiAccount ? patternMultiAccount : patternSingleIp;
 
   // 1. 명확한 공격 (block)
-  // T1110 기법이면서 심각도 10 이상 또는 대량 실패(10건 이상) 또는 다중 계정 대입(5개 이상)
-  // 성공 이력이 없는 순수 대량 공격인 경우
   const isHighSeverity = level >= 10 || count >= 10 || accountsCount >= 5;
   const hasSucceeded = description.includes('성공했습니다');
 
   if (isT1110 && isHighSeverity && !hasSucceeded) {
-    const confidence = 0.95; // 0.85 이상 -> block
+    // 차단 후보만 ZTNA 거부 규칙으로 등록 (만료 시각과 근거 경보 번호 포함)
+    await registerZtnaDenyRule(alert, matchedPatternName);
+
     return {
       action: 'block',
-      confidence,
+      confidence: 0.95,
       reason: matchedPatternName,
     };
   }
 
   // 2. 애매한 건 (alert)
-  // T1110 관련 경보이나 소수 실패 후 성공, 비밀번호 변경 실패, 위치 이상 등 판단이 필요한 경우
   const isAmbiguous = isT1110 && (level >= 5 || count >= 3);
 
   if (isAmbiguous) {
@@ -109,15 +190,17 @@ export async function decide(alert) {
     if (typeof jevScore === 'number' && Number.isFinite(jevScore)) {
       confidence = Math.max(0, Math.min(1, jevScore));
     } else {
-      // Jev가 응답하지 않으면 기본 alert(0.6)로 떨어짐
       confidence = 0.6;
     }
 
     let action = 'alert';
     if (confidence >= 0.85) {
       action = 'block';
+      await registerZtnaDenyRule(alert, matchedPatternName);
     } else if (confidence >= 0.5) {
       action = 'alert';
+      // 알림은 xdr/alerts.log에 한 줄씩 기록
+      await recordAlertLog(alert, matchedPatternName);
     } else {
       action = 'record';
     }
@@ -130,11 +213,10 @@ export async function decide(alert) {
   }
 
   // 3. 정상 이벤트 (record)
-  // T1110 미포함, 낮은 레벨(level < 5), 정상 로그인/로그아웃/세션 확인 등
-  const confidence = 0.1; // 0.5 미만 -> record
+  // 정상 사용자는 거부 규칙에 등록하지 않음 (통과)
   return {
     action: 'record',
-    confidence,
+    confidence: 0.1,
     reason: '정상 이벤트',
   };
 }
