@@ -1,0 +1,17 @@
+[
+  {
+    "name": "요청 인자 안의 SQL 구문 반복",
+    "condition": "동일한 출발 IP에서 URL 쿼리나 요청 매개변수에 데이터베이스 질의(SQL 구문) 표기를 이어 붙인 비정상 요청이 10회 이상 반복됨",
+    "rationale": "MITRE ATT&CK T1190(Exploit Public-Facing Application): 웹 입력 검증 미흡을 악용하여 데이터베이스를 무단 조회하거나 변조하려는 SQL 주입 공격 기법입니다."
+  },
+  {
+    "name": "스크립트 태그 및 표식 삽입 반복",
+    "condition": "동일한 출발 IP에서 검색어나 요청 파라미터에 스크립트 태그나 스크립트 실행 표식을 삽입하는 요청이 8회 이상 반복됨",
+    "rationale": "MITRE ATT&CK T1190(Exploit Public-Facing Application): 웹 애플리케이션의 취약한 입력을 통해 임의 코드를 실행하거나 세션을 탈취하려는 스크립트 주입 공격 기법입니다."
+  },
+  {
+    "name": "경로 거슬러 올라가기 반복",
+    "condition": "동일한 출발 IP에서 파일 경로나 이름 매개변수에 상위 디렉터리 이동 표기(../) 및 경로 이탈 표기를 8회 이상 반복적으로 사용함",
+    "rationale": "MITRE ATT&CK T1190(Exploit Public-Facing Application): 파일 참조 취약점을 악용하여 웹 루트 외부의 시스템 파일이나 내부 자료에 접근하려는 경로 순회 공격 기법입니다."
+  }
+]

@@ -88,5 +88,77 @@
     "expiresAt": "2026-10-09T01:55:31.506Z",
     "reason": "짧은 시간 같은 주소의 로그인 실패 연속",
     "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-01",
+    "alertId": "wi-01",
+    "ip": "203.0.113.10",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "요청 인자 안의 SQL 구문 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-02",
+    "alertId": "wi-02",
+    "ip": "203.0.113.10",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "스크립트 태그 및 표식 삽입 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-03",
+    "alertId": "wi-03",
+    "ip": "198.51.100.15",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "경로 거슬러 올라가기 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-04",
+    "alertId": "wi-04",
+    "ip": "192.0.2.15",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "요청 인자 안의 SQL 구문 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-05",
+    "alertId": "wi-05",
+    "ip": "203.0.113.18",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "스크립트 태그 및 표식 삽입 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-06",
+    "alertId": "wi-06",
+    "ip": "198.51.100.18",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "요청 인자 안의 SQL 구문 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-07",
+    "alertId": "wi-07",
+    "ip": "192.0.2.21",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "경로 거슬러 올라가기 반복",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_wi-08",
+    "alertId": "wi-08",
+    "ip": "203.0.113.22",
+    "user": null,
+    "expiresAt": "2026-10-09T02:40:00.000Z",
+    "reason": "요청 인자 안의 SQL 구문 반복",
+    "action": "deny"
   }
 ]

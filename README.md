@@ -23,9 +23,14 @@
   - 배포 식별 정보(`scripts/deployment-identity.mjs`)에 `originalApiUrl`을 연동하여 `public/aleph.json`에 HTTPS 원본 자료 주소가 정상 생성됩니다.
   - `aleph.config.json`의 `allowedRoutes`에 실제 사용되는 허용 경로들이 올바르게 등록되어 있습니다.
 
-* **보너스 작전: 무차별 로그인 공격 탐지 (XDR)**:
+* **보너스 작전 1: 무차별 로그인 공격 탐지 (XDR)**:
   - `xdr/fixtures/brute-force.json`의 가상 Wazuh 경보(T1110)를 분석하는 `xdr/brute-force/decide.mjs` 및 `patterns.json`을 구현했습니다.
   - 동일 IP 대량 실패 및 다중 계정 암호 대입(스프레이) 공격은 즉시 차단(`block`, 10건), 소수 실패 및 모호한 시도는 주의 경보(`alert`, 9건), 정상 세션 활동은 기록(`record`, 9건)으로 분류합니다.
+
+* **보너스 작전 2: 웹 주입 공격 탐지 및 ZTNA 거부 규칙 연동 (XDR)**:
+  - `xdr/fixtures/web-injection.json`의 가상 Wazuh 경보(MITRE ATT&CK T1190)를 분석하는 `xdr/web-injection/decide.mjs` 및 `patterns.json`을 구현했습니다.
+  - SQL 구문 삽입, 스크립트 태그 삽입, 상위 경로 이동(`../`) 등 명확한 공격은 차단(`block`, 8건), 단발성/수업명 등 애매한 시도는 경보(`alert`, 9건), 정상 활동은 기록(`record`, 9건)으로 판정합니다.
+  - 차단 대상 IP는 ZTNA 판정기(`src/decider.mjs`)에 만료 시각과 근거 경보 번호가 포함된 거부 규칙으로 연동되어 우선 차단되며, 애매한 시도는 `xdr/alerts.log`에 누적 기록됩니다.
 
 ---
 
@@ -37,7 +42,11 @@
    ```
 2. **보너스 작전(XDR) 경보 분석 실행**:
    ```bash
+   # 무차별 로그인 공격 분석
    npm run xdr:run -- brute-force
+
+   # 웹 주입 공격 분석
+   npm run xdr:run -- web-injection
    ```
 3. **제출 묶음 생성 및 자기 점검**:
    ```bash
