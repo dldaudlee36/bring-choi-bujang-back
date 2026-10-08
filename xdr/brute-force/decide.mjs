@@ -102,7 +102,15 @@ async function recordAlertLog(alert, patternName) {
 
   try {
     await mkdir(dirname(ALERTS_LOG_PATH), { recursive: true });
-    await appendFile(ALERTS_LOG_PATH, line, 'utf8');
+    let existing = '';
+    try {
+      existing = await readFile(ALERTS_LOG_PATH, 'utf8');
+    } catch {
+      // 파일 미존재
+    }
+    if (!existing.includes(`id=${alertId} `)) {
+      await appendFile(ALERTS_LOG_PATH, line, 'utf8');
+    }
   } catch {
     // 로깅 실패 방어
   }
