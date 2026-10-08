@@ -62,8 +62,21 @@ async function registerZtnaDenyRule(alert, patternName) {
   const ip = alert?.data?.srcip;
   if (!ip) return;
 
-  // 만료 시각: 24시간 뒤
-  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  // 기존 파일에서 로드되지 않았으면 로드
+  if (denyRules.length === 0) {
+    try {
+      const raw = await readFile(DENY_RULES_PATH, 'utf8');
+      const loaded = JSON.parse(raw);
+      if (Array.isArray(loaded)) denyRules.push(...loaded);
+    } catch {
+      // 파일 미존재
+    }
+  }
+
+  const existingIdx = denyRules.findIndex(r => r.alertId === alertId);
+  const expiresAt = (existingIdx >= 0 && denyRules[existingIdx].expiresAt)
+    ? denyRules[existingIdx].expiresAt
+    : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
   const rule = {
     ruleId: `xdr_deny_${alertId}`,
@@ -75,7 +88,6 @@ async function registerZtnaDenyRule(alert, patternName) {
     action: 'deny',
   };
 
-  const existingIdx = denyRules.findIndex(r => r.alertId === alertId);
   if (existingIdx >= 0) {
     denyRules[existingIdx] = rule;
   } else {
@@ -83,8 +95,17 @@ async function registerZtnaDenyRule(alert, patternName) {
   }
 
   try {
-    await mkdir(dirname(DENY_RULES_PATH), { recursive: true });
-    await writeFile(DENY_RULES_PATH, `${JSON.stringify(denyRules, null, 2)}\n`, 'utf8');
+    const newContent = `${JSON.stringify(denyRules, null, 2)}\n`;
+    let currentContent = '';
+    try {
+      currentContent = await readFile(DENY_RULES_PATH, 'utf8');
+    } catch {
+      // 파일 없음
+    }
+    if (currentContent !== newContent) {
+      await mkdir(dirname(DENY_RULES_PATH), { recursive: true });
+      await writeFile(DENY_RULES_PATH, newContent, 'utf8');
+    }
   } catch {
     // 영속화 실패 방어
   }
