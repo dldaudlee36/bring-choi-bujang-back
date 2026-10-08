@@ -3,147 +3,302 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>BYTE BACK | 점령된 자료실</title>
+  <title>BYTE BACK | 보안 관제 센터</title>
   <style>
-    :root { color-scheme: dark; font-family: system-ui, sans-serif; }
-    body { margin: 0; min-height: 100vh; background: #101a28; color: #ecf4ff; }
-    main { max-width: 760px; margin: 0 auto; padding: 44px 22px 64px; }
-    .eyebrow { color: #8ad8df; font-size: 14px; font-weight: 700; letter-spacing: .08em; }
-    h1 { margin: 16px 0; font-size: clamp(30px, 7vw, 48px); line-height: 1.2; }
-    p { font-size: 17px; line-height: 1.7; color: #bfd0e5; }
-    .notice { margin: 26px 0; padding: 18px; border: 1px solid #d07384; border-radius: 14px; color: #ffe3e8; background: #612a3544; }
-    .auth-panel { margin: 24px 0; padding: 22px; border: 1px solid #51667c; border-radius: 14px; background: #152233; }
-    .auth-panel h2 { margin: 0 0 16px; font-size: 20px; color: #ecf4ff; }
-    .auth-form { display: grid; gap: 14px; }
-    .field { display: grid; gap: 6px; }
-    .field label { font-size: 14px; color: #8ad8df; font-weight: 600; }
-    .field input, .crud-form textarea { background: #0c1521; border: 1px solid #51667c; border-radius: 8px; padding: 10px 14px; color: #ecf4ff; font-size: 15px; }
-    .field input:focus, .crud-form textarea:focus { outline: 2px solid #8ad8df; border-color: transparent; }
-    button { cursor: pointer; border-radius: 8px; border: none; font-size: 15px; font-weight: 600; padding: 10px 16px; transition: background 0.15s; }
-    #login-button { background: #2563eb; color: #fff; margin-top: 6px; }
-    #login-button:hover { background: #1d4ed8; }
-    #logout-button { background: #475569; color: #fff; }
-    #logout-button:hover { background: #334155; }
-    .auth-error { color: #f87171; font-size: 14px; line-height: 1.5; min-height: 20px; }
-    .user-profile { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-    .user-info { display: flex; flex-direction: column; gap: 4px; }
-    .user-label { font-size: 13px; color: #8ad8df; }
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif;
+      --bg: #0b1220; --panel: #121c2e; --panel2: #17233a; --line: #26364f;
+      --text: #e8f0fc; --muted: #93a5bf; --accent: #38bdf8;
+      --crit: #ef4444; --high: #f97316; --med: #eab308; --low: #22c55e;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); }
+    [hidden] { display: none !important; }
+    button { cursor: pointer; font: inherit; border: 0; border-radius: 8px; font-weight: 600; padding: 10px 16px; color: #fff; }
+    input, textarea { font: inherit; background: #0a1322; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 11px 14px; width: 100%; }
+    input:focus, textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-    /* CRUD 영역 스타일 */
-    .note-crud-section { margin: 24px 0; padding: 22px; border: 1px solid #51667c; border-radius: 14px; background: #152233; }
-    .note-crud-section h3 { margin: 0 0 14px; font-size: 18px; color: #ecf4ff; }
-    .crud-form { display: grid; gap: 12px; }
-    .crud-form textarea { font-family: inherit; resize: vertical; }
-    #create-note-btn { background: #059669; color: #fff; justify-self: start; }
-    #create-note-btn:hover { background: #047857; }
+    /* ---------- 로그인 ---------- */
+    .login-view { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
+    .login-hero { padding: 56px; display: flex; flex-direction: column; justify-content: center; gap: 22px;
+      background: radial-gradient(900px 500px at 20% 10%, #0e3a5c55, transparent), linear-gradient(160deg, #0d1a2e, #09101c); border-right: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: .12em; font-size: 15px; color: var(--accent); }
+    .logo { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(135deg, #0ea5e9, #1d4ed8); display: grid; place-items: center; font-size: 18px; }
+    .login-hero h1 { margin: 0; font-size: clamp(30px, 4vw, 46px); line-height: 1.2; }
+    .login-hero p { margin: 0; color: var(--muted); line-height: 1.7; max-width: 460px; }
+    .hero-points { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 10px; color: var(--muted); font-size: 15px; }
+    .hero-points li::before { content: "●"; color: var(--low); margin-right: 10px; font-size: 10px; vertical-align: middle; }
+    .login-side { display: grid; place-items: center; padding: 32px; }
+    .login-card { width: 100%; max-width: 400px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 32px; }
+    .login-card h2 { margin: 0 0 6px; font-size: 22px; }
+    .login-card .sub { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+    .field { display: grid; gap: 6px; margin-bottom: 16px; }
+    .field label { font-size: 13px; color: var(--muted); font-weight: 600; }
+    .btn-primary { width: 100%; background: #0284c7; padding: 12px; margin-top: 4px; }
+    .btn-primary:hover { background: #0369a1; }
+    .btn-primary:disabled { opacity: .6; cursor: wait; }
+    .auth-error { min-height: 20px; margin-top: 12px; color: #fca5a5; font-size: 14px; }
+    .login-foot { margin-top: 18px; font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+    /* ---------- 대시보드 ---------- */
+    .app { min-height: 100vh; display: grid; grid-template-columns: 220px 1fr; }
+    .sidebar { background: #0a1424; border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; gap: 22px; }
+    .nav { display: grid; gap: 4px; }
+    .nav a { display: block; padding: 10px 12px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 14px; }
+    .nav a.active, .nav a:hover { background: var(--panel2); color: var(--text); }
+    .side-note { margin-top: auto; font-size: 12px; color: var(--muted); line-height: 1.6; }
+    .content { display: flex; flex-direction: column; min-width: 0; }
+    .topbar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 28px; border-bottom: 1px solid var(--line); background: #0d1626; }
+    .topbar h1 { margin: 0; font-size: 20px; }
+    .top-right { display: flex; align-items: center; gap: 14px; }
+    .status-pill { font-size: 13px; padding: 5px 12px; border-radius: 999px; background: #14532d55; color: #86efac; border: 1px solid #166534; }
+    .user-email { font-size: 14px; color: var(--muted); }
+    .btn-ghost { background: #334155; padding: 8px 14px; font-size: 14px; }
+    .btn-ghost:hover { background: #475569; }
+    main { padding: 24px 28px 48px; display: grid; gap: 20px; }
+    .demo-banner { font-size: 13px; padding: 10px 14px; border: 1px dashed #4b5d78; border-radius: 10px; color: var(--muted); background: #0f1a2d; }
+
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+    .kpi { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; border-top: 3px solid var(--accent); }
+    .kpi.crit { border-top-color: var(--crit); } .kpi.high { border-top-color: var(--high); } .kpi.ok { border-top-color: var(--low); }
+    .kpi .label { font-size: 13px; color: var(--muted); }
+    .kpi .value { font-size: 32px; font-weight: 800; margin: 6px 0 2px; }
+    .kpi .delta { font-size: 12px; color: var(--muted); }
+
+    .grid2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px; min-width: 0; }
+    .card h2 { margin: 0 0 14px; font-size: 16px; }
+    .bars { display: flex; align-items: flex-end; gap: 6px; height: 170px; padding-top: 8px; }
+    .bar { flex: 1; background: linear-gradient(180deg, #38bdf8, #1d4ed8); border-radius: 4px 4px 0 0; min-height: 4px; position: relative; }
+    .bar.hot { background: linear-gradient(180deg, #f87171, #b91c1c); }
+    .axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+    .donut-wrap { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+    .donut { width: 130px; height: 130px; border-radius: 50%; position: relative; flex-shrink: 0;
+      background: conic-gradient(var(--crit) 0 8%, var(--high) 8% 28%, var(--med) 28% 63%, var(--low) 63% 100%); }
+    .donut::after { content: ""; position: absolute; inset: 24px; border-radius: 50%; background: var(--panel); }
+    .legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 14px; }
+    .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 12px; }
+    .table-scroll { overflow-x: auto; }
+    .sev { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+    .sev.crit { background: #7f1d1d88; color: #fca5a5; } .sev.high { background: #7c2d1288; color: #fdba74; }
+    .sev.med { background: #71350088; color: #fde047; } .sev.low { background: #14532d88; color: #86efac; }
+
+    /* 메모 CRUD (기존 기능 유지) */
+    .crud-form { display: grid; gap: 10px; margin-bottom: 16px; }
+    #create-note-btn { background: #059669; justify-self: start; } #create-note-btn:hover { background: #047857; }
     .crud-message { font-size: 14px; min-height: 18px; }
-
-    /* 메모 목록 스타일 */
-    ul { list-style: none; display: grid; gap: 12px; padding: 0; }
-    .note-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; }
+    ul.notes { list-style: none; display: grid; gap: 10px; padding: 0; margin: 0; }
+    .note-item { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--panel2); }
     .note-content { flex: 1; min-width: 0; }
-    strong { display: block; font-size: 18px; margin-bottom: 5px; }
-    .note-content span { color: #bfd0e5; display: block; word-break: break-word; white-space: pre-wrap; }
-    .note-actions { display: flex; gap: 8px; flex-shrink: 0; }
-    .btn-edit { background: #3b82f6; color: #fff; font-size: 13px; padding: 7px 13px; }
-    .btn-edit:hover { background: #2563eb; }
-    .btn-delete { background: #dc2626; color: #fff; font-size: 13px; padding: 7px 13px; }
-    .btn-delete:hover { background: #b91c1c; }
-    .empty-item { border: 1px solid #51667c; border-radius: 14px; padding: 17px 19px; background: #1a2a3d; color: #bfd0e5; }
+    .note-content strong { display: block; margin-bottom: 4px; }
+    .note-content span { color: var(--muted); display: block; word-break: break-word; white-space: pre-wrap; font-size: 14px; }
+    .note-actions { display: flex; gap: 8px; }
+    .btn-edit { background: #2563eb; font-size: 13px; padding: 6px 12px; } .btn-delete { background: #dc2626; font-size: 13px; padding: 6px 12px; }
+    .empty-item { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--panel2); color: var(--muted); }
+
+    @media (max-width: 960px) {
+      .login-view { grid-template-columns: 1fr; } .login-hero { display: none; }
+      .app { grid-template-columns: 1fr; } .sidebar { display: none; }
+      .kpis { grid-template-columns: repeat(2, 1fr); } .grid2 { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <div class="eyebrow">BYTE BACK · 3단계 로그인 및 메모 관리</div>
-    <h1>점령된 자료실</h1>
-    <p>지금은 보호 장치가 없는 상태입니다. 아래 기록은 모두 실습을 위해 만든 가상 자료입니다.</p>
-
-    <section id="auth-panel" class="auth-panel" aria-label="사용자 인증">
-      <h2>자료실 출입 인증</h2>
-      <form id="login-form" class="auth-form" autocomplete="off">
+  <!-- ===== 로그인 화면 ===== -->
+  <section id="login-view" class="login-view" aria-label="로그인">
+    <div class="login-hero">
+      <div class="brand"><span class="logo" aria-hidden="true">🛡</span>BYTE BACK SOC</div>
+      <h1>보안 관제 센터</h1>
+      <p>위협 탐지, 경보 분석, 대응 현황을 한 화면에서 확인합니다. 승인된 관제 요원만 접근할 수 있습니다.</p>
+      <ul class="hero-points">
+        <li>승인된 계정만 접속 가능</li>
+        <li>모든 접속 시도는 기록 대상입니다</li>
+        <li>화면의 지표는 실습용 가상 자료입니다</li>
+      </ul>
+    </div>
+    <div class="login-side">
+      <form id="login-form" class="login-card" autocomplete="off">
+        <h2>관제 시스템 로그인</h2>
+        <p class="sub">발급받은 계정으로 인증하세요.</p>
         <div class="field">
           <label for="email">이메일</label>
-          <input type="email" id="email" required autocomplete="off" placeholder="user@example.com">
+          <input type="email" id="email" required autocomplete="off" placeholder="이메일 주소">
         </div>
         <div class="field">
           <label for="password">비밀번호</label>
           <input type="password" id="password" required autocomplete="new-password" placeholder="비밀번호">
         </div>
-        <button type="submit" id="login-button">로그인</button>
+        <button type="submit" id="login-button" class="btn-primary">로그인</button>
         <div id="auth-error" class="auth-error" role="alert" aria-live="assertive"></div>
+        <div class="login-foot">비밀번호는 화면이나 로그에 저장되지 않습니다. 계정 문제는 관리자에게 문의하세요.</div>
       </form>
+    </div>
+  </section>
 
-      <div id="user-profile" class="user-profile" style="display: none;">
-        <div class="user-info">
-          <span class="user-label">접속 중인 계정</span>
-          <strong id="user-email"></strong>
-        </div>
-        <button type="button" id="logout-button">로그아웃</button>
-      </div>
-    </section>
+  <!-- ===== 대시보드 ===== -->
+  <div id="dashboard-view" class="app" hidden>
+    <aside class="sidebar">
+      <div class="brand"><span class="logo" aria-hidden="true">🛡</span>BYTE BACK</div>
+      <nav class="nav" aria-label="메뉴">
+        <a href="#overview" class="active">개요</a>
+        <a href="#alerts">경보 목록</a>
+        <a href="#notes-section">자료실(가상 메모)</a>
+      </nav>
+      <div class="side-note">Step 5 · 가상 자료<br>실제 운영 연동 전 기본 화면입니다.</div>
+    </aside>
 
-    <!-- 메모 추가 영역 (로그인 시 표시) -->
-    <section id="note-crud-section" class="note-crud-section" style="display: none;" aria-label="메모 관리">
-      <h3>새 가상 메모 추가</h3>
-      <form id="create-note-form" class="crud-form">
-        <div class="field">
-          <label for="new-note-title">메모 제목</label>
-          <input type="text" id="new-note-title" required placeholder="메모 제목을 입력하세요">
+    <div class="content">
+      <header class="topbar">
+        <h1>보안 관제 대시보드</h1>
+        <div class="top-right">
+          <span class="status-pill">● 시스템 정상</span>
+          <span id="user-email" class="user-email"></span>
+          <button type="button" id="logout-button" class="btn-ghost">로그아웃</button>
         </div>
-        <div class="field">
-          <label for="new-note-body">메모 본문</label>
-          <textarea id="new-note-body" rows="3" required placeholder="메모 본문 내용을 입력하세요"></textarea>
-        </div>
-        <button type="submit" id="create-note-btn">메모 추가</button>
-        <div id="crud-message" class="crud-message" role="status"></div>
-      </form>
-    </section>
+      </header>
 
-    <div class="notice">로그인하지 않은 방문자에게는 자료가 숨겨지며, 승인된 사용자만 메모를 추가·수정·삭제할 수 있습니다.</div>
-    <ul id="notes" aria-live="polite"><li class="empty-item">로그인 후 자료를 확인할 수 있습니다.</li></ul>
-  </main>
+      <main>
+        <div class="demo-banner">아래 지표와 경보는 화면 구성을 위한 <strong>가상 샘플 데이터</strong>이며 실제 탐지 결과가 아닙니다.</div>
+
+        <section id="overview" class="kpis" aria-label="핵심 지표">
+          <div class="kpi crit"><div class="label">긴급 경보</div><div class="value" id="kpi-crit">0</div><div class="delta">즉시 대응 필요</div></div>
+          <div class="kpi high"><div class="label">오늘 탐지 이벤트</div><div class="value" id="kpi-events">0</div><div class="delta">최근 24시간</div></div>
+          <div class="kpi"><div class="label">차단된 접속</div><div class="value" id="kpi-blocked">0</div><div class="delta">로그인 실패·비정상 접근</div></div>
+          <div class="kpi ok"><div class="label">정상 감시 자산</div><div class="value" id="kpi-assets">0</div><div class="delta">에이전트 응답 중</div></div>
+        </section>
+
+        <div class="grid2">
+          <section class="card" aria-label="시간대별 이벤트">
+            <h2>최근 24시간 이벤트 추이</h2>
+            <div id="bars" class="bars" role="img" aria-label="시간대별 이벤트 막대 그래프"></div>
+            <div class="axis"><span>24시간 전</span><span>12시간 전</span><span>현재</span></div>
+          </section>
+          <section class="card" aria-label="심각도 분포">
+            <h2>심각도 분포</h2>
+            <div class="donut-wrap">
+              <div class="donut" role="img" aria-label="긴급 8%, 높음 20%, 보통 35%, 낮음 37%"></div>
+              <ul class="legend">
+                <li><span class="dot" style="background:var(--crit)"></span>긴급 8%</li>
+                <li><span class="dot" style="background:var(--high)"></span>높음 20%</li>
+                <li><span class="dot" style="background:var(--med)"></span>보통 35%</li>
+                <li><span class="dot" style="background:var(--low)"></span>낮음 37%</li>
+              </ul>
+            </div>
+          </section>
+        </div>
+
+        <section id="alerts" class="card" aria-label="최근 경보">
+          <h2>최근 경보</h2>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>시각</th><th>심각도</th><th>유형</th><th>대상</th><th>상태</th></tr></thead>
+              <tbody id="alert-rows"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="notes-section" class="card" aria-label="자료실">
+          <h2>자료실 (가상 메모)</h2>
+          <form id="create-note-form" class="crud-form">
+            <input type="text" id="new-note-title" required placeholder="메모 제목">
+            <textarea id="new-note-body" rows="3" required placeholder="메모 본문"></textarea>
+            <button type="submit" id="create-note-btn">메모 추가</button>
+            <div id="crud-message" class="crud-message" role="status"></div>
+          </form>
+          <ul id="notes" class="notes" aria-live="polite"><li class="empty-item">불러오는 중...</li></ul>
+        </section>
+      </main>
+    </div>
+  </div>
 
   <script type="module">
     let currentToken = null;
 
+    const loginView = document.querySelector('#login-view');
+    const dashView = document.querySelector('#dashboard-view');
     const loginForm = document.querySelector('#login-form');
-    const userProfile = document.querySelector('#user-profile');
     const emailInput = document.querySelector('#email');
     const passwordInput = document.querySelector('#password');
     const authError = document.querySelector('#auth-error');
     const userEmail = document.querySelector('#user-email');
     const logoutButton = document.querySelector('#logout-button');
     const loginButton = document.querySelector('#login-button');
-    const crudSection = document.querySelector('#note-crud-section');
     const createNoteForm = document.querySelector('#create-note-form');
     const crudMessage = document.querySelector('#crud-message');
     const list = document.querySelector('#notes');
 
+    // ----- 가상 샘플 데이터 (실제 탐지 결과 아님) -----
+    const SAMPLE = {
+      kpi: { crit: 3, events: 1284, blocked: 217, assets: 46 },
+      hourly: [12,18,15,22,30,26,19,14,11,9,13,20,34,41,38,52,47,60,88,73,55,42,36,28],
+      alerts: [
+        ['10:42', 'crit', '무차별 로그인 시도', 'web-gateway-01', '조사 중'],
+        ['10:31', 'high', '비정상 데이터 반출', 'file-srv-03', '확인 필요'],
+        ['10:05', 'high', '권한 상승 시도', 'admin-pc-12', '조사 중'],
+        ['09:48', 'med', '알려진 취약점 스캔', 'api-edge-02', '차단됨'],
+        ['09:12', 'med', '웹 인젝션 패턴', 'web-gateway-01', '차단됨'],
+        ['08:55', 'low', '새 기기 로그인', 'vpn-gw-01', '확인 완료']
+      ],
+      sev: { crit: '긴급', high: '높음', med: '보통', low: '낮음' }
+    };
+
+    function renderDashboard() {
+      document.querySelector('#kpi-crit').textContent = SAMPLE.kpi.crit;
+      document.querySelector('#kpi-events').textContent = SAMPLE.kpi.events.toLocaleString('ko-KR');
+      document.querySelector('#kpi-blocked').textContent = SAMPLE.kpi.blocked;
+      document.querySelector('#kpi-assets').textContent = SAMPLE.kpi.assets;
+
+      const max = Math.max(...SAMPLE.hourly);
+      document.querySelector('#bars').replaceChildren(...SAMPLE.hourly.map((v, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar' + (v >= max * 0.8 ? ' hot' : '');
+        bar.style.height = `${Math.round((v / max) * 100)}%`;
+        bar.title = `${24 - i}시간 전: ${v}건`;
+        return bar;
+      }));
+
+      document.querySelector('#alert-rows').replaceChildren(...SAMPLE.alerts.map(([time, sev, type, target, state]) => {
+        const tr = document.createElement('tr');
+        const cells = [time, null, type, target, state].map((text, idx) => {
+          const td = document.createElement('td');
+          if (idx === 1) {
+            const badge = document.createElement('span');
+            badge.className = `sev ${sev}`;
+            badge.textContent = SAMPLE.sev[sev];
+            td.append(badge);
+          } else {
+            td.textContent = text;
+          }
+          return td;
+        });
+        tr.append(...cells);
+        return tr;
+      }));
+    }
+
     function clearInputs() {
+      loginForm.reset();
       emailInput.value = '';
       passwordInput.value = '';
-      emailInput.defaultValue = '';
-      passwordInput.defaultValue = '';
-      loginForm.reset();
-      setTimeout(() => {
-        emailInput.value = '';
-        passwordInput.value = '';
-      }, 50);
     }
 
     function renderAuthState(user, token) {
       currentToken = token;
       if (user) {
-        loginForm.style.display = 'none';
-        userProfile.style.display = 'flex';
+        loginView.hidden = true;
+        dashView.hidden = false;
         userEmail.textContent = user.email || '(이메일 정보 없음)';
         authError.textContent = '';
-        crudSection.style.display = 'block';
+        renderDashboard();
       } else {
-        loginForm.style.display = 'grid';
-        userProfile.style.display = 'none';
+        loginView.hidden = false;
+        dashView.hidden = true;
         userEmail.textContent = '';
-        crudSection.style.display = 'none';
         clearInputs();
       }
     }
@@ -152,18 +307,16 @@
       event.preventDefault();
       authError.textContent = '';
       loginButton.disabled = true;
-      loginButton.textContent = '로그인 중...';
-
+      loginButton.textContent = '인증 중...';
       const email = emailInput.value.trim();
       const password = passwordInput.value;
-
       try {
         const response = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password })
         });
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         if (!response.ok) {
           authError.textContent = `로그인 실패: ${data.error || '이메일 또는 비밀번호가 올바르지 않습니다.'}`;
         } else {
@@ -184,39 +337,29 @@
     logoutButton.addEventListener('click', () => {
       sessionStorage.removeItem('session_token');
       sessionStorage.removeItem('session_user');
-      clearInputs();
       renderAuthState(null, null);
       loadNotes(null);
     });
 
-    // 메모 추가 제출
     createNoteForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!currentToken) return;
-
       const titleInput = document.querySelector('#new-note-title');
       const bodyInput = document.querySelector('#new-note-body');
       const title = titleInput.value.trim();
       const body = bodyInput.value.trim();
-
       crudMessage.textContent = '메모를 추가하는 중...';
-      crudMessage.style.color = '#8ad8df';
-
+      crudMessage.style.color = '#38bdf8';
       try {
         const response = await fetch('/api/notes', {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${currentToken}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ title, body })
         });
-
         if (!response.ok) {
           const errData = await response.json().catch(() => ({}));
           throw new Error(errData.message || '메모 추가에 실패했습니다.');
         }
-
         createNoteForm.reset();
         crudMessage.textContent = '메모가 성공적으로 추가되었습니다.';
         crudMessage.style.color = '#4ade80';
@@ -228,35 +371,21 @@
       }
     });
 
-    async function loadNotes(token) {
-      if (!token) {
-        const item = document.createElement('li');
-        item.className = 'empty-item';
-        item.textContent = '로그인 후 자료를 확인할 수 있습니다.';
-        list.replaceChildren(item);
-        return;
-      }
+    function emptyItem(text) {
+      const item = document.createElement('li');
+      item.className = 'empty-item';
+      item.textContent = text;
+      return item;
+    }
 
+    async function loadNotes(token) {
+      if (!token) { list.replaceChildren(emptyItem('로그인 후 자료를 확인할 수 있습니다.')); return; }
       try {
-        const response = await fetch('/api/notes', {
-          cache: 'no-store',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (!response.ok) {
-          throw new Error('자료를 불러올 수 없습니다 (인증 거부).');
-        }
+        const response = await fetch('/api/notes', { cache: 'no-store', headers: { 'Authorization': `Bearer ${token}` } });
+        if (!response.ok) throw new Error('자료를 불러올 수 없습니다 (인증 거부).');
         const data = await response.json();
         const notes = Array.isArray(data) ? data : (data.notes || []);
-
-        if (notes.length === 0) {
-          const item = document.createElement('li');
-          item.className = 'empty-item';
-          item.textContent = '보관된 메모가 없습니다.';
-          list.replaceChildren(item);
-          return;
-        }
+        if (notes.length === 0) { list.replaceChildren(emptyItem('보관된 메모가 없습니다.')); return; }
 
         list.replaceChildren(...notes.map(note => {
           const item = document.createElement('li');
@@ -274,7 +403,6 @@
           const actionsBox = document.createElement('div');
           actionsBox.className = 'note-actions';
 
-          // 수정 버튼
           const editBtn = document.createElement('button');
           editBtn.type = 'button';
           editBtn.className = 'btn-edit';
@@ -284,14 +412,10 @@
             if (newTitle === null) return;
             const newBody = prompt('수정할 메모 본문을 입력하세요:', note.body ?? note.content ?? '');
             if (newBody === null) return;
-
             try {
               const putRes = await fetch(`/api/notes/${encodeURIComponent(note.id)}`, {
                 method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${currentToken}`,
-                  'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${currentToken}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title: newTitle, body: newBody })
               });
               if (!putRes.ok) {
@@ -304,20 +428,16 @@
             }
           });
 
-          // 삭제 버튼
           const deleteBtn = document.createElement('button');
           deleteBtn.type = 'button';
           deleteBtn.className = 'btn-delete';
           deleteBtn.textContent = '삭제';
           deleteBtn.addEventListener('click', async () => {
             if (!confirm(`'${note.title}' 메모를 삭제하시겠습니까?`)) return;
-
             try {
               const delRes = await fetch(`/api/notes/${encodeURIComponent(note.id)}`, {
                 method: 'DELETE',
-                headers: {
-                  'Authorization': `Bearer ${currentToken}`
-                }
+                headers: { 'Authorization': `Bearer ${currentToken}` }
               });
               if (!delRes.ok) {
                 const errData = await delRes.json().catch(() => ({}));
@@ -334,22 +454,15 @@
           return item;
         }));
       } catch (error) {
-        const item = document.createElement('li');
-        item.className = 'empty-item';
-        item.textContent = error.message;
-        list.replaceChildren(item);
+        list.replaceChildren(emptyItem(error.message));
       }
     }
 
     // 세션 초기화
-    let initialToken = sessionStorage.getItem('session_token');
+    const initialToken = sessionStorage.getItem('session_token');
     let initialUser = null;
-    try {
-      initialUser = JSON.parse(sessionStorage.getItem('session_user') || 'null');
-    } catch {
-      initialUser = null;
-    }
-    renderAuthState(initialUser, initialToken);
+    try { initialUser = JSON.parse(sessionStorage.getItem('session_user') || 'null'); } catch { initialUser = null; }
+    renderAuthState(initialToken ? initialUser : null, initialToken);
     loadNotes(initialToken);
   </script>
 </body>

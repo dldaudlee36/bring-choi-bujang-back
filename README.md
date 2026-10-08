@@ -23,6 +23,10 @@
   - 배포 식별 정보(`scripts/deployment-identity.mjs`)에 `originalApiUrl`을 연동하여 `public/aleph.json`에 HTTPS 원본 자료 주소가 정상 생성됩니다.
   - `aleph.config.json`의 `allowedRoutes`에 실제 사용되는 허용 경로들이 올바르게 등록되어 있습니다.
 
+* **보너스 작전: 무차별 로그인 공격 탐지 (XDR)**:
+  - `xdr/fixtures/brute-force.json`의 가상 Wazuh 경보(T1110)를 분석하는 `xdr/brute-force/decide.mjs` 및 `patterns.json`을 구현했습니다.
+  - 동일 IP 대량 실패 및 다중 계정 암호 대입(스프레이) 공격은 즉시 차단(`block`, 10건), 소수 실패 및 모호한 시도는 주의 경보(`alert`, 9건), 정상 세션 활동은 기록(`record`, 9건)으로 분류합니다.
+
 ---
 
 ## 🔄 다시 실행하는 방법
@@ -31,11 +35,15 @@
    ```bash
    npm run test:r5
    ```
-2. **제출 묶음 생성 및 자기 점검**:
+2. **보너스 작전(XDR) 경보 분석 실행**:
+   ```bash
+   npm run xdr:run -- brute-force
+   ```
+3. **제출 묶음 생성 및 자기 점검**:
    ```bash
    npm run bundle
    ```
-3. **배포 사이트 확인**:
+4. **배포 사이트 확인**:
    - 배포 주소: https://choi-bujang-secret-vault-6asl.vercel.app
    - 로그인하지 않은 창에서는 자료가 노출되지 않습니다.
    - 사용자 A/B 각자 로그인 시 본인의 메모만 CRUD가 정상 수행됩니다.
