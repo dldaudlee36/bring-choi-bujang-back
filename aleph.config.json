@@ -1,5 +1,5 @@
 {
-  "step": 9,
+  "step": 10,
   "repoUrl": "https://github.com/dldaudlee36/bring-choi-bujang-back",
   "publicAppUrl": "https://rescue-choi-bujang-pc.vercel.app",
   "sampleMarker": null,
@@ -15,8 +15,9 @@
     "GET /api/notes/:id",
     "PUT /api/notes/:id",
     "DELETE /api/notes/:id",
-    "POST /api/login"
+    "POST /api/login",
+    "POST /api/restore"
   ],
   "originalApiUrl": "https://mxiycelcxviyvsixuytr.supabase.co/rest/v1/notes",
-  "restoreRoute": null
+  "restoreRoute": "POST /api/restore"
 }

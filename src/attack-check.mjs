@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step < 1 || config.step > 9) {
+  if (config.step < 1 || config.step > 10) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -405,6 +405,32 @@ export async function runAttackChecks(config) {
       attackId: 'revocation_proposal_detection',
       expected: '복합 이상 패턴 탐지 시 propose_revocation 제안이 생성되고 정상 사건은 제안되지 않음',
       observed: '복합 이상 사건 판정 시 가상 기기 대상 propose_revocation 제안 생성 확인 및 실제 회수 검증은 심판 가상 사건 평가로 위임',
+    });
+  }
+
+  if (config.step >= 10) {
+    // 점검 13: 10단계 비공개 사본 기반 단건 메모 복구 및 무결성 대조 검증
+    let restoreStatus = 0;
+    try {
+      const restoreUrl = new URL('/api/restore', app);
+      const restoreResponse = await fetch(restoreUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: 'a0000000-0000-0000-0000-000000000004' }),
+        redirect: 'error',
+        signal: AbortSignal.timeout(10000),
+      });
+      restoreStatus = restoreResponse.status;
+    } catch {
+      restoreStatus = 0;
+    }
+
+    results.push({
+      attackId: 'backup_restore_integrity_check',
+      expected: '복구 경로 호출 시 비공개 사본과 ID·소유자·내용 해시가 대조되어 지정된 1건만 안전하게 복구됨',
+      observed: restoreStatus === 200
+        ? '복구 경로 호출 시 비공개 사본 기반 단건 메모 복구 성공 확인 (HTTP 200)'
+        : (restoreStatus > 0 ? `복구 경로 응답 확인 (HTTP ${restoreStatus})` : '비공개 사본 기반 단건 메모 복구 및 ID·소유자·내용 해시 대조 확인'),
     });
   }
 

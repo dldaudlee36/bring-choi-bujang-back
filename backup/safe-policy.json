@@ -1,0 +1,21 @@
+{
+  "schema": "aleph.policy.backup.v1",
+  "version": "9.0.0",
+  "revision": 9,
+  "verifiedAt": "2026-10-13T14:57:00.000Z",
+  "policyRules": [
+    "device_registered",
+    "step_up_required",
+    "zone_access"
+  ],
+  "allowedRoutes": [
+    "GET /api/notes",
+    "POST /api/notes",
+    "GET /api/notes/:id",
+    "PUT /api/notes/:id",
+    "DELETE /api/notes/:id",
+    "POST /api/login",
+    "POST /api/restore"
+  ],
+  "checksum": "18326a5b69b0e8fb9afbeeba6ebd65cde1645f3e63525685b5ee185a581326dc"
+}
