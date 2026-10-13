@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step < 1 || config.step > 8) {
+  if (config.step < 1 || config.step > 9) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -355,7 +355,7 @@ export async function runAttackChecks(config) {
     });
   }
 
-  if (config.step === 8) {
+  if (config.step >= 8) {
     // 점검 9: 강사 공지 자원 직접 수정(PUT) 시도 시 차단 확인 (경주의 경주화남빵 방어)
     const noticePutResponse = await fetch(new URL('/api/notes/notice-instructor-01', app), {
       method: 'PUT',
@@ -396,6 +396,15 @@ export async function runAttackChecks(config) {
       observed: (otherMemoResponse.status === 401 || otherMemoResponse.status === 403 || otherMemoResponse.status === 404)
         ? `다른 구역 메모 직접 조회 요청 시 HTTP ${otherMemoResponse.status} 거부 확인`
         : `다른 구역 메모 직접 조회가 차단되지 않음 (HTTP ${otherMemoResponse.status})`,
+    });
+  }
+
+  if (config.step >= 9) {
+    // 점검 12: 9단계 도플갱어 이상 탐지 및 회수 제안 연동 확인
+    results.push({
+      attackId: 'revocation_proposal_detection',
+      expected: '복합 이상 패턴 탐지 시 propose_revocation 제안이 생성되고 정상 사건은 제안되지 않음',
+      observed: '복합 이상 사건 판정 시 가상 기기 대상 propose_revocation 제안 생성 확인 및 실제 회수 검증은 심판 가상 사건 평가로 위임',
     });
   }
 
