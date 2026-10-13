@@ -1,31 +1,17 @@
-import { isIpBlockedByZtna as isBfBlocked } from '../xdr/brute-force/decide.mjs';
-import { isIpBlockedByZtna as isWiBlocked } from '../xdr/web-injection/decide.mjs';
-
-// ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기 시작점입니다.
-// 6단계부터 규칙을 하나씩 추가합니다. 이 기본 응답은 모든 요청을 거부합니다.
+// ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기입니다.
+// 6단계 규칙 device_registered: 등록되어 사용자와 묶인 기기만 내 자료실 읽기(GET notes)를 허용합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
 export const RULE_IDS = Object.freeze(['device_registered']);
 
 export async function decide(request) {
-  // XDR 차단 후보 거부 규칙 연결 (기존 규칙을 대체하지 않고 차단 대상 IP 우선 거부)
-  try {
-    const clientIp = request?.clientIp || request?.signals?.source;
-    if (clientIp && (isBfBlocked(clientIp) || isWiBlocked(clientIp))) {
-      return {
-        schema: 'aleph.decision.v1',
-        requestId: request.requestId,
-        decision: 'deny',
-        reasonCode: 'xdr_ip_blocked',
-        ruleIds: [RULE_IDS[0]],
-      };
-    }
-  } catch {
-    // 규칙 조회 실패 시 기존 판정기 규칙으로 안전 진행
-  }
+  // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered)·동작(method)·경로(service)만 검증합니다.
+  const hasLogin = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
+  const hasDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
+  const isDeviceRegistered = request?.deviceRegistered === true;
+  const isReadAction = request?.method === 'GET';
+  const isNotesService = request?.service === 'notes';
 
-  // 6단계 규칙 device_registered: 엔진이 확인한 deviceRegistered 가 true 일 때만 허용합니다.
-  // 값이 false 이거나 없으면(undefined 포함) 거부합니다.
-  if (request?.deviceRegistered === true) {
+  if (hasLogin && hasDevice && isDeviceRegistered && isReadAction && isNotesService) {
     return {
       schema: 'aleph.decision.v1',
       requestId: request.requestId,
@@ -34,6 +20,7 @@ export async function decide(request) {
       ruleIds: ['device_registered'],
     };
   }
+
   return {
     schema: 'aleph.decision.v1',
     requestId: request?.requestId,
