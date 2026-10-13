@@ -301,6 +301,8 @@ export default async function handler(request, response) {
   // 6. DB 복원 시도 (환경변수 존재 시 단 1건의 B 메모만 복구, 타인 메모는 건드리지 않음)
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SECRET_KEY;
+  let allNotes = null;
+  let existingB = null;
 
   if (supabaseUrl && supabaseKey) {
     try {
@@ -309,8 +311,9 @@ export default async function handler(request, response) {
       });
 
       // 기존 DB 내 메모 조회
-      const { data: allNotes } = await supabase.from('notes').select('*');
-      const existingB = allNotes?.find(n =>
+      const res = await supabase.from('notes').select('*');
+      allNotes = res.data;
+      existingB = allNotes?.find(n =>
         (targetId && n.id === targetId) ||
         n.id === matchedNote.id ||
         (Array.isArray(matchedNote.aliases) && matchedNote.aliases.includes(n.id)) ||
