@@ -47,8 +47,13 @@ async function parseBody(request) {
 }
 
 function formatNote(record) {
+  const rawId = String(record.id);
+  const resourceId = rawId.startsWith('note-') || rawId.startsWith('notice-')
+    ? rawId
+    : `note-${rawId}`;
   return {
-    id: String(record.id),
+    id: rawId,
+    resourceId,
     title: record.title,
     body: record.body ?? record.content ?? '',
   };
@@ -85,10 +90,14 @@ export default async function handler(request, response) {
     return response.status(401).json({ error: 'UNAUTHORIZED' });
   }
 
-  // 2. 경로 ID 추출 (/:id)
+  // 2. 경로 ID 추출 (/:id) 및 자원 구역(내 메모 vs 강사 공지) 판별
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   const pathPart = url.pathname.replace(/^\/api\/notes\/?/i, '').trim();
   const id = request.query?.id || (pathPart ? decodeURIComponent(pathPart) : null);
+  const isNotice = typeof id === 'string' && (id.startsWith('notice-') || id === 'notice');
+  const dbId = typeof id === 'string' ? id.replace(/^note-/i, '') : id;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const targetId = typeof dbId === 'string' && UUID_RE.test(dbId) ? dbId : (typeof id === 'string' && UUID_RE.test(id) ? id : null);
 
   const supabase = createClient(supabaseUrl, supabaseKey, {
     auth: {
@@ -100,14 +109,39 @@ export default async function handler(request, response) {
   const method = request.method;
 
   try {
+    // [강사 공지 자원 처리: notice-]
+    if (isNotice) {
+      if (method === 'GET') {
+        return response.status(200).json({
+          id: id || 'notice-instructor-01',
+          title: '[강사 공지] 실습 및 구역 보안 안내',
+          body: '학생 자료실 메모와 강사 공지는 서로 다른 구역 자원으로 분리 관리됩니다. 학생 계정은 공지를 수정할 수 없습니다.',
+        });
+      }
+      // 강사 공지 수정/삭제/추가 시도 시 강사 권한 검증 (화면 메뉴나 요청 본문·쿼리의 role을 신뢰하지 않음)
+      if (method === 'PUT' || method === 'DELETE' || method === 'POST') {
+        const isInstructor = verifiedUser.kind === 'instructor' || verifiedUser.role === 'instructor';
+        if (!isInstructor) {
+          return response.status(403).json({
+            error: 'FORBIDDEN',
+            reason: 'INSUFFICIENT_ROLE',
+            message: '강사 권한이 없습니다.',
+          });
+        }
+      }
+    }
+
     // [GET] 목록 조회 또는 단건 조회
     if (method === 'GET') {
       if (id) {
+        if (!targetId) {
+          return response.status(404).json({ error: 'NOT_FOUND' });
+        }
         // 단건 GET: /api/notes/:id -> { id, title, body }
         const { data, error } = await supabase
           .from('notes')
           .select('*')
-          .eq('id', id)
+          .eq('id', targetId)
           .maybeSingle();
 
         if (error) {
@@ -116,13 +150,17 @@ export default async function handler(request, response) {
         if (!data) {
           return response.status(404).json({ error: 'NOT_FOUND' });
         }
-        // 타인 메모 접근 차단 (본인 확인)
+        // 타인 메모 접근 차단 (검증된 사용자와 저장된 소유자 대조)
         if (data.owner_id !== verifiedUser.userId) {
-          return response.status(403).json({ error: 'FORBIDDEN' });
+          return response.status(403).json({
+            error: 'FORBIDDEN',
+            reason: 'NOT_OWNER',
+            message: '본인 소유의 메모만 접근할 수 있습니다.',
+          });
         }
         return response.status(200).json(formatNote(data));
       } else {
-        // 목록 GET: /api/notes -> 본인의 메모만 조회
+        // 목록 GET: /api/notes -> 본인의 메모만 조회 (요청 쿼리의 owner_id나 role은 무시하고 검증된 토큰의 userId로 강제)
         const { data, error } = await supabase
           .from('notes')
           .select('*')
@@ -146,8 +184,23 @@ export default async function handler(request, response) {
         return response.status(400).json({ error: 'TITLE_REQUIRED' });
       }
 
-      const noteId = body.id?.trim() || randomUUID();
-      // URL·본문의 owner_id를 신뢰하지 않고 검증된 토큰의 사용자 ID로 저장
+      // 공지 자원 생성 시도 차단 (요청 본문의 role을 무시하고 토큰 권한 검증)
+      const requestedId = (body.id?.trim() || id || '').toLowerCase();
+      if (requestedId.startsWith('notice')) {
+        const isInstructor = verifiedUser.kind === 'instructor' || verifiedUser.role === 'instructor';
+        if (!isInstructor) {
+          return response.status(403).json({
+            error: 'FORBIDDEN',
+            reason: 'INSUFFICIENT_ROLE',
+            message: '강사 권한이 없습니다.',
+          });
+        }
+      }
+
+      const rawId = body.id?.trim();
+      const cleanId = rawId ? rawId.replace(/^note-/i, '') : null;
+      const noteId = (cleanId && UUID_RE.test(cleanId)) ? cleanId : randomUUID();
+      // URL·본문의 owner_id나 role을 신뢰하지 않고 검증된 토큰의 사용자 ID로 저장
       let insertData = {
         id: noteId,
         title,
@@ -175,11 +228,14 @@ export default async function handler(request, response) {
       if (!id) {
         return response.status(400).json({ error: 'ID_REQUIRED' });
       }
+      if (!targetId) {
+        return response.status(404).json({ error: 'NOT_FOUND' });
+      }
 
       const { data: existing, error: findError } = await supabase
         .from('notes')
         .select('*')
-        .eq('id', id)
+        .eq('id', targetId)
         .maybeSingle();
 
       if (findError) {
@@ -189,19 +245,31 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOT_FOUND' });
       }
 
-      // 기존 행의 소유자가 본인인지 확인
+      // 기존 행의 저장된 소유자와 검증된 사용자 대조
       if (existing.owner_id !== verifiedUser.userId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({
+          error: 'FORBIDDEN',
+          reason: 'NOT_OWNER',
+          message: '본인 소유의 메모만 수정할 수 있습니다.',
+        });
       }
 
       const body = await parseBody(request);
 
-      // 새 행의 소유자 확인 (소유자 변경 시도 차단)
+      // 요청 본문이나 쿼리의 role/owner_id 조작 시도 차단
       if (body.owner_id !== undefined && body.owner_id !== verifiedUser.userId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({
+          error: 'FORBIDDEN',
+          reason: 'NOT_OWNER',
+          message: '본인 소유의 메모만 수정할 수 있습니다.',
+        });
       }
       if (request.query?.owner_id !== undefined && request.query.owner_id !== verifiedUser.userId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({
+          error: 'FORBIDDEN',
+          reason: 'NOT_OWNER',
+          message: '본인 소유의 메모만 수정할 수 있습니다.',
+        });
       }
 
       const title = body.title !== undefined ? body.title : existing.title;
@@ -216,7 +284,7 @@ export default async function handler(request, response) {
       let { error: updateError } = await supabase
         .from('notes')
         .update(updateData)
-        .eq('id', id)
+        .eq('id', targetId)
         .eq('owner_id', verifiedUser.userId);
 
       if (updateError && updateError.message?.includes("'body' column")) {
@@ -225,7 +293,7 @@ export default async function handler(request, response) {
         const retry = await supabase
           .from('notes')
           .update(updateData)
-          .eq('id', id)
+          .eq('id', targetId)
           .eq('owner_id', verifiedUser.userId);
         updateError = retry.error;
       }
@@ -234,7 +302,7 @@ export default async function handler(request, response) {
         return response.status(500).json({ error: 'DATABASE_UPDATE_ERROR', message: updateError.message });
       }
 
-      return response.status(200).json({ id, title, body: noteBody });
+      return response.status(200).json(formatNote({ id: existing.id, title, body: noteBody }));
     }
 
     // [DELETE] 메모 삭제: /api/notes/:id
@@ -242,11 +310,14 @@ export default async function handler(request, response) {
       if (!id) {
         return response.status(400).json({ error: 'ID_REQUIRED' });
       }
+      if (!targetId) {
+        return response.status(404).json({ error: 'NOT_FOUND' });
+      }
 
       const { data: existing, error: findError } = await supabase
         .from('notes')
         .select('id, owner_id')
-        .eq('id', id)
+        .eq('id', targetId)
         .maybeSingle();
 
       if (findError) {
@@ -256,15 +327,19 @@ export default async function handler(request, response) {
         return response.status(404).json({ error: 'NOT_FOUND' });
       }
 
-      // 소유자가 본인인지 확인 (타인 메모 삭제 차단)
+      // 저장된 소유자와 검증된 사용자 대조 (타인 메모 삭제 차단)
       if (existing.owner_id !== verifiedUser.userId) {
-        return response.status(403).json({ error: 'FORBIDDEN' });
+        return response.status(403).json({
+          error: 'FORBIDDEN',
+          reason: 'NOT_OWNER',
+          message: '본인 소유의 메모만 삭제할 수 있습니다.',
+        });
       }
 
       const { error: deleteError } = await supabase
         .from('notes')
         .delete()
-        .eq('id', id)
+        .eq('id', targetId)
         .eq('owner_id', verifiedUser.userId);
 
       if (deleteError) {

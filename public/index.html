@@ -203,7 +203,12 @@
         </section>
 
         <section id="notes-section" class="card" aria-label="자료실">
-          <h2>자료실 (가상 메모)</h2>
+          <h2>자료실 (가상 메모 및 공지 구역)</h2>
+          <div id="notice-card" class="notice-card" style="margin-bottom: 16px; border: 1px solid #38bdf8; border-radius: 12px; padding: 14px 16px; background: #0c2340;">
+            <div style="font-size: 11px; color: #38bdf8; font-weight: 700; margin-bottom: 4px;">자원 ID: notice-instructor-01 (공지 구역)</div>
+            <strong style="color: #e8f0fc; display: block; margin-bottom: 4px;">[강사 공지] 실습 및 구역 보안 안내</strong>
+            <span style="color: #93a5bf; font-size: 14px;">학생 자료실 메모와 강사 공지는 서로 다른 구역 자원으로 분리 관리됩니다. 학생 계정은 공지를 수정할 수 없습니다.</span>
+          </div>
           <form id="create-note-form" class="crud-form">
             <input type="text" id="new-note-title" required placeholder="메모 제목">
             <textarea id="new-note-body" rows="3" required placeholder="메모 본문"></textarea>
@@ -394,11 +399,17 @@
 
           const contentBox = document.createElement('div');
           contentBox.className = 'note-content';
+          const resBadge = document.createElement('div');
+          resBadge.style.fontSize = '11px';
+          resBadge.style.color = '#93a5bf';
+          resBadge.style.marginBottom = '4px';
+          const displayId = note.resourceId || (String(note.id).startsWith('note-') ? note.id : `note-${note.id}`);
+          resBadge.textContent = `자원 ID: ${displayId} (내 메모 구역)`;
           const title = document.createElement('strong');
           const body = document.createElement('span');
           title.textContent = note.title;
           body.textContent = note.body ?? note.content ?? '';
-          contentBox.append(title, body);
+          contentBox.append(resBadge, title, body);
 
           const actionsBox = document.createElement('div');
           actionsBox.className = 'note-actions';

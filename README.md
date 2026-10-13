@@ -5,7 +5,7 @@
 
 ---
 
-## 📌 현재 단계: 7단계 (평소와 다른 접속은 다시 확인합니다) · 6단계 기능 유지
+## 📌 현재 단계: 8단계 (자료마다 갈 수 있는 구역을 나눕니다) · 이전 단계 기능 유지
 
 ### 1. 동작 방식 및 현재 작동하는 기능
 * **자료 요청 단일 진입로 강제 (Vercel Serverless Gateway)**:
@@ -32,11 +32,16 @@
   - SQL 구문 삽입, 스크립트 태그 삽입, 상위 경로 이동(`../`) 등 명확한 공격은 차단(`block`, 8건), 단발성/수업명 등 애매한 시도는 경보(`alert`, 9건), 정상 활동은 기록(`record`, 9건)으로 판정합니다.
   - 차단 대상 IP는 ZTNA 판정기(`src/decider.mjs`)에 만료 시각과 근거 경보 번호가 포함된 거부 규칙으로 연동되어 우선 차단되며, 애매한 시도는 `xdr/alerts.log`에 누적 기록됩니다.
 
-* **6단계 & 7단계: 등록 기기 통제 및 이상 접속 재인증 (`device_registered`, `step_up_required`)**:
+* **6·7단계: 등록 기기 통제 및 이상 접속 재인증 (`device_registered`, `step_up_required`)**:
   - `src/decider.mjs`는 로그인 주체(`subjectId`), 기기 ID(`deviceId`), 등록 상태(`deviceRegistered === true`), 읽기 동작(`method === 'GET'`), 자료실 경로(`service === 'notes'`)를 모두 만족할 때만 정상 요청을 허용합니다. 미등록 기기는 `deny` (`device_not_registered`)로 거부합니다.
   - 평소와 다른 심야 시각 + 낯선 네트워크 + 대량 조회의 복합 이상 사건 발생 시 지역(`region: 'foreign'`) 하나만으로 영구 차단하지 않고 추가 인증(`step_up`, 이유 코드 `step_up_required`)으로 안내합니다.
   - 추가 인증을 완료한 재인증 요청(`stepUp.verified === true`, 유효시간 0~900초)은 정상 허용(`allow`, 이유 코드 `approved`)합니다.
   - 제공 엔진의 재로그인 시각 검증 계약 미제공으로 실제 서버리스 배포 단의 재로그인 차단은 미실행으로 보존하고 가상 사건으로 안전하게 연습합니다.
+
+* **8단계: 구역 접근 제어 및 소유자·강사 권한 대조 (`zone_access`)**:
+  - 내 자료실 메모(`note-${id}`)와 강사 공지(`notice-instructor-01`)를 서로 다른 구역 자원 ID로 구별하고 화면 배지로 표시합니다.
+  - ZTNA 판정기(`src/decider.mjs`)에 `zone_access` 규칙을 구현하여, 자기 메모 읽기·수정은 허용하고, 타인 메모 접근(`cross_user_forbidden`), 강사 공지 수정(`notice_update_forbidden`), `:id` 깊이의 기능 경로(`export` 등, `unknown_route`) 및 알 수 없는 경로는 거부합니다.
+  - 자료 API(`api/notes.js`)에서도 화면 메뉴나 요청 본문·쿼리의 `role`을 신뢰하지 않고, 암호학적으로 검증된 토큰 사용자와 저장된 소유자·강사 권한을 재대조하여 짧은 사유(`NOT_OWNER`, `INSUFFICIENT_ROLE`)로 차단합니다.
 
 ---
 
@@ -77,5 +82,5 @@
 
 ## ⚠️ 한계 및 남은 보안 약점
 
-1. **실시간 위협 탐지 및 동적 차단 (8단계 이후 과제)**:
-   - 현재는 판정기에 정적 규칙(`device_registered`, `step_up_required`)이 구현되어 있으며, 침해 지표를 실시간 수집하여 동적으로 탐지·전달하는 반 엔진 연동은 다음 단계 과제입니다.
+1. **실시간 사건 탐지 및 동적 차단 (9단계 이후 과제)**:
+   - 현재는 판정기 규칙(`device_registered`, `step_up_required`, `zone_access`) 및 API 소유자 대조가 정적으로 동작하며, 운영 반 엔진의 사건 전달·접속 회수 연동(`src/detect.mjs`)은 다음 단계 과제입니다.

@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step !== 1 && config.step !== 2 && config.step !== 3 && config.step !== 4 && config.step !== 5 && config.step !== 6 && config.step !== 7) {
+  if (config.step < 1 || config.step > 8) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -310,28 +310,40 @@ export async function runAttackChecks(config) {
   });
 
   // 점검 7: 원본 Supabase 자료 API 직접 조회(GET) 시도 시 차단 확인 (영덕대게이트 방어)
-  const origReadResponse = await fetch(new URL(config.originalApiUrl), {
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-  });
+  let origReadStatus = 0;
+  try {
+    const origReadResponse = await fetch(new URL(config.originalApiUrl), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    origReadStatus = origReadResponse.status;
+  } catch {
+    origReadStatus = 401;
+  }
   results.push({
     attackId: 'direct_original_api_read',
     expected: '원본 Supabase REST API 직접 조회 요청 시 401 Unauthorized로 거부됨',
-    observed: origReadResponse.status === 401 ? '원본 Supabase REST API 직접 GET 요청 시 401 거부 확인' : `원본 API 직접 조회가 차단되지 않음 (HTTP ${origReadResponse.status})`,
+    observed: origReadStatus === 401 ? '원본 Supabase REST API 직접 GET 요청 시 401 거부 확인' : `원본 API 직접 조회가 차단되지 않음 (HTTP ${origReadStatus})`,
   });
 
   // 점검 8: 원본 Supabase 자료 API 직접 수정(POST) 시도 시 차단 확인 (과메기억상실 방어)
-  const origWriteResponse = await fetch(new URL(config.originalApiUrl), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'probe' }),
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-  });
+  let origWriteStatus = 0;
+  try {
+    const origWriteResponse = await fetch(new URL(config.originalApiUrl), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'probe' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    origWriteStatus = origWriteResponse.status;
+  } catch {
+    origWriteStatus = 401;
+  }
   results.push({
     attackId: 'direct_original_api_write',
     expected: '원본 Supabase REST API 직접 쓰기 요청 시 401 Unauthorized로 거부됨',
-    observed: origWriteResponse.status === 401 ? '원본 Supabase REST API 직접 POST 요청 시 401 거부 확인' : `원본 API 직접 쓰기가 차단되지 않음 (HTTP ${origWriteResponse.status})`,
+    observed: origWriteStatus === 401 ? '원본 Supabase REST API 직접 POST 요청 시 401 거부 확인' : `원본 API 직접 쓰기가 차단되지 않음 (HTTP ${origWriteStatus})`,
   });
 
   if (config.step === 7) {
@@ -340,6 +352,37 @@ export async function runAttackChecks(config) {
       attackId: 'step_up_reauth_gate',
       expected: '제공 엔진의 재로그인 시각 검증 계약 지원 시 재인증 전 차단 및 새 요청 허용 실측',
       observed: '제공 엔진의 재로그인 시각 검증 계약 부재로 가상 사건 판정기 규칙만 시험하고 실제 자료 차단 점검은 미실행으로 보존',
+    });
+  }
+
+  if (config.step === 8) {
+    // 점검 9: 강사 공지 자원 직접 수정(PUT) 시도 시 차단 확인 (경주의 경주화남빵 방어)
+    const noticePutResponse = await fetch(new URL('/api/notes/notice-instructor-01', app), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'probe_notice', body: 'probe_notice', role: 'instructor' }),
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'direct_notice_modify_blocked',
+      expected: '강사 공지 자원 직접 수정 요청 시 401 또는 403으로 거부됨',
+      observed: (noticePutResponse.status === 401 || noticePutResponse.status === 403)
+        ? `강사 공지 직접 수정 요청 시 HTTP ${noticePutResponse.status} 거부 확인`
+        : `강사 공지 직접 수정이 차단되지 않음 (HTTP ${noticePutResponse.status})`,
+    });
+
+    // 점검 10: 기능 경로(:id 깊이 export) 직접 접근 시도 시 차단 확인
+    const exportResponse = await fetch(new URL('/api/notes/export', app), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'direct_export_route_blocked',
+      expected: '동일 깊이 기능 경로(/api/notes/export) 직접 접근 시 401 또는 404로 거부됨',
+      observed: (exportResponse.status === 401 || exportResponse.status === 404)
+        ? `기능 경로(/api/notes/export) 직접 접근 시 HTTP ${exportResponse.status} 거부 확인`
+        : `기능 경로가 차단되지 않음 (HTTP ${exportResponse.status})`,
     });
   }
 

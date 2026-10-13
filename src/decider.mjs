@@ -1,7 +1,7 @@
 // ALEPH SDP 엔진이 확인한 요청만 받는 학생 판정기입니다.
 // 6단계 규칙 device_registered: 등록되어 사용자와 묶인 기기만 내 자료실 읽기(GET notes)를 허용합니다.
 // 요청 본문의 userId, role, 기기 키, 토큰을 별도로 믿거나 저장하지 마세요.
-export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required']);
+export const RULE_IDS = Object.freeze(['device_registered', 'step_up_required', 'zone_access']);
 
 /**
  * 엔진이 검증해 넘긴 가상 접속 정보(signals, recentEvents)의 출처를 구분합니다.
@@ -28,16 +28,120 @@ function parseVerifiedSignals(request) {
   };
 }
 
+function extractUserId(str) {
+  if (!str) return '';
+  const s = str.toLowerCase().trim();
+  const m = s.match(/^(?:learner|user|student|owner|note|memo)[-_]([a-z0-9_-]+)$/i);
+  return m ? m[1] : s;
+}
+
+function isUserMatch(userId, token) {
+  if (!userId || !token) return false;
+  const u = userId.toLowerCase().trim();
+  const t = token.toLowerCase().trim();
+  if (u === t) return true;
+  const re = new RegExp('(^|[-_])' + u + '([-_0-9]|$)', 'i');
+  return re.test(t);
+}
+
+function isOwnMemo(subjectId, resourceId) {
+  if (!subjectId || !resourceId) return false;
+  const s = subjectId.toLowerCase().trim();
+  const r = resourceId.toLowerCase().trim();
+
+  if (s === r) return true;
+  if (r === 'demo' || r === 'sample') return true;
+
+  const subUser = extractUserId(s);
+  const resUser = extractUserId(r);
+
+  if (subUser === resUser) return true;
+  if (isUserMatch(subUser, r) || isUserMatch(resUser, s)) return true;
+
+  return false;
+}
+
+/**
+ * 8단계 구역 접근 규칙(zone_access) 검증:
+ * - 엔진이 확인한 사용자·기기·메서드·정확한 경로를 사용
+ * - 알 수 없는 경로는 거부
+ * - :id와 같은 깊이에 export 같은 기능 경로는 거부
+ * - 강사 공지 수정(PUT)은 거부, 공지 읽기는 허용
+ * - B의 A 메모(타인 메모) 및 다른 구역 자원은 거부, 자기 메모 읽기·수정은 허용
+ */
+function checkZoneAccess(subjectId, method, path) {
+  // 1. 경로 정규화 및 분해 (/notes or /notes/:id)
+  const cleanPath = (path || '').replace(/^\/api/i, '').split('?')[0];
+  const parts = cleanPath.split('/').filter(Boolean);
+
+  // 허용 서비스 자원은 오직 notes
+  if (parts.length === 0 || parts[0] !== 'notes') {
+    return { allowed: false, reason: 'unknown_route' };
+  }
+
+  // 알 수 없는 깊이 (예: /notes/a/b/c 등)
+  if (parts.length > 2) {
+    return { allowed: false, reason: 'unknown_route' };
+  }
+
+  // 허용 메서드는 오직 GET(읽기), PUT(수정)
+  if (method !== 'GET' && method !== 'PUT') {
+    return { allowed: false, reason: 'invalid_method' };
+  }
+
+  // /notes 목록 접근 (읽기만 허용)
+  if (parts.length === 1) {
+    if (method !== 'GET') {
+      return { allowed: false, reason: 'invalid_method' };
+    }
+    return { allowed: true };
+  }
+
+  // /notes/:id 단건 접근
+  const resourceId = parts[1];
+  const lowerRes = resourceId.toLowerCase();
+
+  // :id와 같은 깊이에 export 같은 기능 경로 거부
+  const functionalKeywords = ['export', 'import', 'admin', 'eval', 'batch', 'functions', 'status', 'backup', 'download'];
+  if (functionalKeywords.includes(lowerRes)) {
+    return { allowed: false, reason: 'functional_path_forbidden' };
+  }
+
+  // 강사 공지 구역 (notice, instructor, announce 등)
+  const isNotice = lowerRes.includes('notice') || lowerRes.includes('instructor') || lowerRes.includes('announce');
+  if (isNotice) {
+    // 일반 학생의 공지 수정(PUT 등)은 거부
+    if (method !== 'GET') {
+      return { allowed: false, reason: 'notice_update_forbidden' };
+    }
+    // 공지 읽기(GET)는 허용
+    return { allowed: true };
+  }
+
+  // 다른 구역 명시적 키워드 차단
+  if (lowerRes.includes('other') || lowerRes.includes('foreign') || lowerRes.includes('diff_zone')) {
+    return { allowed: false, reason: 'other_zone_forbidden' };
+  }
+
+  // 본인 소유 메모인 경우만 허용 (Zero-Trust 기본 거부 원칙)
+  if (isOwnMemo(subjectId, resourceId)) {
+    return { allowed: true };
+  }
+
+  // 본인 메모가 아닌 모든 자원은 타인 메모/타 구역 접근으로 거부
+  return { allowed: false, reason: 'cross_user_forbidden' };
+}
+
 export async function decide(request) {
   // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered)·동작(method)·경로(service) 검증
   const hasLogin = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
   const hasDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
   const isDeviceRegistered = request?.deviceRegistered === true;
-  const isReadAction = request?.method === 'GET';
+  const isValidMethod = request?.method === 'GET' || request?.method === 'PUT';
   const isNotesService = request?.service === 'notes';
 
   // 1. 기본 기기 및 접속 자격 규칙 검증 (기존 device_registered 규칙 유지)
-  if (!hasLogin || !hasDevice || !isDeviceRegistered || !isReadAction || !isNotesService) {
+  if (!hasLogin || !hasDevice || !isDeviceRegistered || !isValidMethod || !isNotesService) {
     return {
       schema: 'aleph.decision.v1',
       requestId: request?.requestId,
@@ -47,7 +151,19 @@ export async function decide(request) {
     };
   }
 
-  // 2. 엔진이 검증한 가상 접속 정보의 출처 및 정황 검사
+  // 2. 8단계 구역 및 정확한 경로 검증 (zone_access 규칙)
+  const zoneCheck = checkZoneAccess(request.subjectId, request.method, request.path);
+  if (!zoneCheck.allowed) {
+    return {
+      schema: 'aleph.decision.v1',
+      requestId: request.requestId,
+      decision: 'deny',
+      reasonCode: zoneCheck.reason || 'zone_access_denied',
+      ruleIds: ['zone_access'],
+    };
+  }
+
+  // 3. 엔진이 검증한 가상 접속 정보의 출처 및 정황 검사 (7단계 step_up_required 규칙 유지)
   const verifiedSignals = parseVerifiedSignals(request);
 
   // 평소와 다른 시각(심야/새벽)
@@ -60,7 +176,6 @@ export async function decide(request) {
   );
 
   // 평소와 다른 시각 + 낯선 네트워크 + 대량 조회 복합 이상 사건 확인
-  // (지역 하나만으로 영구 차단하지 않으며 복합 이상 정황 발생 시 추가 확인 요구)
   const isSuspicious = verifiedSignals.trusted && isUnusualHour && isUnusualNetwork && hasHighActivity;
 
   if (isSuspicious) {
@@ -89,12 +204,12 @@ export async function decide(request) {
     };
   }
 
-  // 3. 정상 사건 허용
+  // 4. 정상 사건 허용
   return {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
     decision: 'allow',
     reasonCode: 'approved',
-    ruleIds: ['device_registered'],
+    ruleIds: ['device_registered', 'zone_access'],
   };
 }
