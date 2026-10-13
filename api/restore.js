@@ -303,6 +303,7 @@ export default async function handler(request, response) {
   const supabaseKey = process.env.SUPABASE_SECRET_KEY;
   let allNotes = null;
   let existingB = null;
+  let res = null;
 
   if (supabaseUrl && supabaseKey) {
     try {
@@ -311,7 +312,7 @@ export default async function handler(request, response) {
       });
 
       // 기존 DB 내 메모 조회
-      const res = await supabase.from('notes').select('*');
+      res = await supabase.from('notes').select('*');
       allNotes = res.data;
       existingB = allNotes?.find(n =>
         (targetId && n.id === targetId) ||
@@ -392,6 +393,8 @@ export default async function handler(request, response) {
     auditPreserved: true,
     dbDebug: {
       found: existingB ? { id: existingB.id, title: existingB.title, owner_id: existingB.owner_id } : null,
+      error: res?.error ? { message: res.error.message, code: res.error.code } : null,
+      count: allNotes ? allNotes.length : null,
       rows: allNotes?.map(n => ({ id: n.id, title: n.title, owner_id: n.owner_id })),
     },
   });
