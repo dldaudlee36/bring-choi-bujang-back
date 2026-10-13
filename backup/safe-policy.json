@@ -14,8 +14,7 @@
     "GET /api/notes/:id",
     "PUT /api/notes/:id",
     "DELETE /api/notes/:id",
-    "POST /api/login",
-    "POST /api/restore"
+    "POST /api/login"
   ],
-  "checksum": "18326a5b69b0e8fb9afbeeba6ebd65cde1645f3e63525685b5ee185a581326dc"
+  "checksum": "defdc73d94a7c9913c388a4c62b3b3b086c3d784dc751a1242ab388526b55049"
 }

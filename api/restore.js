@@ -48,8 +48,6 @@ async function parseBody(request) {
 }
 
 import { fileURLToPath } from 'node:url';
-import safePolicyData from '../backup/safe-policy.json' with { type: 'json' };
-import notesBackupData from '../backup/notes-backup.json' with { type: 'json' };
 
 function getFilePath(relPath) {
   try {
@@ -69,18 +67,16 @@ function getFilePath(relPath) {
  * 사본이 없거나 체크섬이 불일치하면 즉시 중단합니다.
  */
 export function verifyPolicyBackup(customPath) {
-  let backup;
   const policyBackupPath = customPath || getFilePath('../backup/safe-policy.json');
-  if (existsSync(policyBackupPath)) {
-    try {
-      backup = JSON.parse(readFileSync(policyBackupPath, 'utf8'));
-    } catch (err) {
-      throw new Error(`S10_BACKUP_UNVERIFIED: 정책 사본 읽기 오류: ${err.message}`);
-    }
-  } else if (!customPath && safePolicyData) {
-    backup = safePolicyData;
-  } else {
+  if (!existsSync(policyBackupPath)) {
     throw new Error('S10_BACKUP_UNVERIFIED: 안전 정책 사본 파일이 없습니다.');
+  }
+
+  let backup;
+  try {
+    backup = JSON.parse(readFileSync(policyBackupPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`S10_BACKUP_UNVERIFIED: 정책 사본 읽기 오류: ${err.message}`);
   }
 
   if (backup.schema !== 'aleph.policy.backup.v1') {
@@ -107,18 +103,16 @@ export function verifyPolicyBackup(customPath) {
  * 대상이 명시되지 않았거나 사본 검증이 실패하면 임의 대체 없이 즉시 중단합니다.
  */
 export function loadAndVerifyNoteBackup(targetId, reqOwner, reqHash, customPath) {
-  let backupData;
   const notesBackupPath = customPath || getFilePath('../backup/notes-backup.json');
-  if (existsSync(notesBackupPath)) {
-    try {
-      backupData = JSON.parse(readFileSync(notesBackupPath, 'utf8'));
-    } catch (err) {
-      throw new Error(`S10_BACKUP_UNVERIFIED: 가상 메모 사본 읽기 실패: ${err.message}`);
-    }
-  } else if (!customPath && notesBackupData) {
-    backupData = notesBackupData;
-  } else {
+  if (!existsSync(notesBackupPath)) {
     throw new Error('S10_BACKUP_UNVERIFIED: 가상 메모 사본 파일이 없습니다.');
+  }
+
+  let backupData;
+  try {
+    backupData = JSON.parse(readFileSync(notesBackupPath, 'utf8'));
+  } catch (err) {
+    throw new Error(`S10_BACKUP_UNVERIFIED: 가상 메모 사본 읽기 실패: ${err.message}`);
   }
 
   const notes = Array.isArray(backupData.notes) ? backupData.notes : [];
@@ -317,14 +311,16 @@ export default async function handler(request, response) {
       // 기존 DB 내 메모 조회
       const { data: allNotes } = await supabase.from('notes').select('*');
       const existingB = allNotes?.find(n =>
+        (targetId && n.id === targetId) ||
         n.id === matchedNote.id ||
         (Array.isArray(matchedNote.aliases) && matchedNote.aliases.includes(n.id)) ||
+        (verifiedCaller?.userId && n.owner_id === verifiedCaller.userId) ||
         n.title === '훈련 행정 자료' ||
         n.title === '시험 계정 B의 연구 기록'
       );
 
       if (existingB) {
-        // 변조된 상태(닭크웹): 기존 소유자 UUID를 유지하며 제목과 본문만 안전 사본으로 갱신
+        // 변조된 상태(닭크웹): 기존 소유자 UUID를 보존하고 제목과 본문만 안전 사본으로 갱신 (지정 1건 외 불변)
         let updateData = {
           title: matchedNote.title,
           body: matchedNote.body,
@@ -340,7 +336,7 @@ export default async function handler(request, response) {
           await supabase.from('notes').update(updateData).eq('id', existingB.id).catch(() => {});
         }
       } else {
-        // 삭제된 상태(동래해물피자): B 사용자 계정 식별 후 재삽입
+        // 삭제된 상태(동래해물피자): B 사용자 계정 식별 후 사본 1건 재삽입
         let ownerId = verifiedCaller?.userId || null;
         if (!ownerId) {
           try {

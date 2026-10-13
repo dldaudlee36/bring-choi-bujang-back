@@ -20,6 +20,8 @@
     }
   },
   "rewrites": [
-    { "source": "/api/notes/:id", "destination": "/api/notes?id=:id" }
+    { "source": "/api/notes/:id", "destination": "/api/notes?id=:id" },
+    { "source": "/POST /api/restore", "destination": "/api/restore" },
+    { "source": "/POST%20/api/restore", "destination": "/api/restore" }
   ]
 }

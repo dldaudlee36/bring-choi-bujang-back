@@ -412,7 +412,8 @@ export async function runAttackChecks(config) {
     // 점검 13: 10단계 비공개 사본 기반 단건 메모 복구 및 무결성 대조 검증
     let restoreStatus = 0;
     try {
-      const restoreUrl = new URL('/api/restore', app);
+      const routePath = (config.restoreRoute || '/api/restore').replace(/^POST\s+/i, '');
+      const restoreUrl = new URL(routePath, app);
       const restoreResponse = await fetch(restoreUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

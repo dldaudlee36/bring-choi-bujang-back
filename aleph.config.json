@@ -19,5 +19,5 @@
     "POST /api/restore"
   ],
   "originalApiUrl": "https://mxiycelcxviyvsixuytr.supabase.co/rest/v1/notes",
-  "restoreRoute": "POST /api/restore"
+  "restoreRoute": "/api/restore"
 }
