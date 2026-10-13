@@ -13,7 +13,7 @@ const FIXTURE_PATH = join(ROOT_DIR, 'xdr', 'fixtures', 'known-cve.json');
 const DEFAULT_EXPIRES_AT = '2026-10-18T00:00:00.000Z';
 
 /**
- * ZTNA 판정기 거부 규칙 파일(xdr/deny-rules.json) 읽기
+ * 판정기 거부 규칙 파일(xdr/deny-rules.json) 읽기
  */
 export async function loadDenyRules(filePath = DENY_RULES_PATH) {
   try {
@@ -26,7 +26,7 @@ export async function loadDenyRules(filePath = DENY_RULES_PATH) {
 }
 
 /**
- * ZTNA 판정기 거부 규칙 파일(xdr/deny-rules.json) 저장
+ * 판정기 거부 규칙 파일(xdr/deny-rules.json) 저장
  */
 export async function saveDenyRules(rules, filePath = DENY_RULES_PATH) {
   const content = `${JSON.stringify(rules, null, 2)}\n`;
@@ -48,7 +48,7 @@ export async function appendAlertLog(alert, decision, logPath = ALERTS_LOG_PATH)
 }
 
 /**
- * 단일 경보를 판단하고 차단 후보는 ZTNA 거부 규칙에 등록, 애매한 건은 alerts.log에 기록
+ * 단일 경보를 판단하고 차단 후보는 거부 규칙에 등록, 애매한 건은 alerts.log에 기록
  * - 정상 사용자(record)는 거부 규칙에 절대 등록하지 않음
  *
  * @param {object} alert Wazuh 형태 경보
@@ -62,7 +62,7 @@ export async function respond(alert, options = {}) {
 
   const decision = await decide(alert);
 
-  // 1. 명확한 공격 (block) -> ZTNA 거부 규칙 생성 및 추가
+  // 1. 명확한 공격 (block) -> 거부 규칙 생성 및 추가
   if (decision.action === 'block') {
     const ip = alert?.data?.srcip;
     const alertId = alert?.id || 'unknown';

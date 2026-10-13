@@ -12,11 +12,11 @@ const PATTERNS = [
   },
 ];
 
-// ZTNA 판정기 연동용 거부 규칙 메모리 저장소 (심판 격리 환경 호환)
+// 판정기 연동용 거부 규칙 메모리 저장소 (심판 격리 환경 호환)
 export const denyRules = [];
 
 /**
- * 활성(만료되지 않은) ZTNA 거부 규칙 목록 반환
+ * 활성(만료되지 않은) 거부 규칙 목록 반환
  */
 export function getActiveDenyRules() {
   const now = new Date();
@@ -26,16 +26,16 @@ export function getActiveDenyRules() {
 /**
  * 특정 IP가 거부 규칙에 등록되어 있는지 확인
  */
-export function isIpBlockedByZtna(ip) {
+export function isIpBlockedByPolicy(ip) {
   if (!ip) return false;
   return getActiveDenyRules().some(r => r.ip === ip);
 }
 
 /**
- * 차단 후보에 대해 만료 시각과 근거 경보 번호를 포함한 ZTNA 거부 규칙 생성
+ * 차단 후보에 대해 만료 시각과 근거 경보 번호를 포함한 거부 규칙 생성
  * 정상 사용자는 등록되지 않음
  */
-function registerZtnaDenyRule(alert, patternName) {
+function registerDenyRule(alert, patternName) {
   const alertId = alert?.id || 'unknown';
   const ip = alert?.data?.srcip;
   if (!ip) return;
@@ -118,7 +118,7 @@ export async function decide(alert) {
   const hasSucceeded = description.includes('성공했습니다');
 
   if (isT1110 && isHighSeverity && !hasSucceeded) {
-    registerZtnaDenyRule(alert, matchedPatternName);
+    registerDenyRule(alert, matchedPatternName);
     return {
       action: 'block',
       confidence: 0.95,
@@ -142,7 +142,7 @@ export async function decide(alert) {
     let action = 'alert';
     if (confidence >= 0.85) {
       action = 'block';
-      registerZtnaDenyRule(alert, matchedPatternName);
+      registerDenyRule(alert, matchedPatternName);
     } else if (confidence >= 0.5) {
       action = 'alert';
     } else {
