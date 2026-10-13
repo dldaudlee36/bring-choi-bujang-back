@@ -110,3 +110,18 @@ if (emptyRes.statusCode === 200 && emptyRes.body?.note?.id === expectedNote.id) 
   process.stderr.write(`❌ 기본 단건 복구 오류: HTTP ${emptyRes.statusCode}\n`);
   process.exitCode = 1;
 }
+
+// 6. 사전 검증 / 미리보기(preview / dryRun) 요청 시 버전과 바뀔 항목 확인 테스트
+const previewRes = mockRes();
+await handler({
+  method: 'POST',
+  headers: {},
+  body: { dryRun: true },
+}, previewRes);
+
+if (previewRes.statusCode === 200 && previewRes.body?.preview && previewRes.body?.version && previewRes.body?.changeScope) {
+  process.stdout.write('✅ 사전 검증(dryRun) 시 복원 전 버전과 바뀔 항목 미리보기를 확인했습니다.\n');
+} else {
+  process.stderr.write(`❌ 사전 검증 미리보기 오류: HTTP ${previewRes.statusCode}\n`);
+  process.exitCode = 1;
+}

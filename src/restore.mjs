@@ -187,6 +187,22 @@ export async function restore(target = {}, options = {}) {
     throw new Error('S10_AUDIT_DROPPED: 감사 기록(xdr/alerts.log)이 보존되지 않았습니다.');
   }
 
+  const isDryRun = Boolean(options.dryRun || target.dryRun || options.preview || target.preview);
+  if (isDryRun) {
+    return {
+      action: 'preview',
+      preview: true,
+      restored: false,
+      version: preview.version,
+      revision: preview.revision,
+      verifiedAt: preview.verifiedAt,
+      changeScope: preview.changeScope,
+      note: preview.targetNote,
+      auditPreserved: true,
+      preservedRules: ['device_registered', 'step_up_required', 'zone_access'],
+    };
+  }
+
   // 3. 실제 운영 정책 파일은 수정하지 않고 기준 안전 정책 보존
   // 4. 지정한 한 건 밖의 메모/규칙은 변경하지 않고 지정 1건만 복구 결과로 확정
   return {
@@ -198,6 +214,7 @@ export async function restore(target = {}, options = {}) {
     changeScope: preview.changeScope,
     note: preview.targetNote,
     auditPreserved: true,
+    preservedRules: ['device_registered', 'step_up_required', 'zone_access'],
   };
 }
 

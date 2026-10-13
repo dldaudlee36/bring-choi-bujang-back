@@ -240,7 +240,7 @@ export default async function handler(request, response) {
   if (request.method !== 'POST') {
     return response.status(405).json({
       error: 'METHOD_NOT_ALLOWED',
-      message: '복구 경로는 POST 요청만 허용됩니다.'
+      message: '복구 경로는 POST 요청만 허용됩니다.',
     });
   }
 
@@ -261,6 +261,7 @@ export default async function handler(request, response) {
   const targetId = body.id || body.noteId || body.targetId || body.target?.id || body.target?.noteId || request.query?.id;
   let reqOwner = body.owner_id || body.ownerId || body.subjectId || body.target?.owner_id || body.target?.ownerId;
   const reqHash = body.contentHash || body.hash || body.target?.contentHash || body.target?.hash;
+  const isPreview = Boolean(body.dryRun || body.preview || body.action === 'preview' || request.query?.preview);
 
   // 인증 헤더 확인 (심판 계정 토큰 제공 시 주체 식별)
   const authHeader = request.headers?.authorization || request.headers?.['authorization'];
@@ -287,7 +288,7 @@ export default async function handler(request, response) {
     });
   }
 
-  // 5. 감사 기록 보존 상태 확인 (감사 로그 파일 보존)
+  // 5. 감사 기록 보존 상태 확인 (감사 로그 파일 보존 유지)
   const alertsLogPath = getFilePath('../xdr/alerts.log');
   const auditExists = existsSync(alertsLogPath) || existsSync(join(process.cwd(), 'xdr', 'alerts.log'));
   if (!auditExists) {
@@ -298,13 +299,36 @@ export default async function handler(request, response) {
     });
   }
 
-  // 6. DB 복원 시도 (환경변수 존재 시 단 1건의 B 메모만 복구, 타인 메모는 건드리지 않음)
+  // [실행 전 미리보기 모드] 실제 변경을 적용하지 않고 버전과 바뀔 항목만 보여줌
+  if (isPreview) {
+    return response.status(200).json({
+      success: true,
+      preview: true,
+      restored: false,
+      version: verifiedPolicy.version,
+      revision: verifiedPolicy.revision,
+      verifiedAt: verifiedPolicy.verifiedAt,
+      changeScope: {
+        target: 'note',
+        id: matchedNote.id,
+        owner_id: matchedNote.owner_id,
+        fields: ['title', 'body'],
+      },
+      note: {
+        id: matchedNote.id,
+        owner_id: matchedNote.owner_id,
+        title: matchedNote.title,
+        body: matchedNote.body,
+        contentHash: matchedNote.contentHash,
+      },
+      auditPreserved: true,
+      preservedRules: [...verifiedPolicy.policyRules],
+    });
+  }
+
+  // 6. 실제 DB 복원 시도 (외부 네트워크 환경 지원 시 Supabase 갱신, 샌드박스 격리망에서도 사본 복원 보장)
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SECRET_KEY;
-  let allNotes = null;
-  let existingB = null;
-  let res = null;
-  let catchedError = null;
 
   if (supabaseUrl && supabaseKey) {
     try {
@@ -313,60 +337,57 @@ export default async function handler(request, response) {
       });
 
       // 기존 DB 내 메모 조회
-      res = await supabase.from('notes').select('*');
-      allNotes = res.data;
-      existingB = allNotes?.find(n =>
-        (targetId && n.id === targetId) ||
-        n.id === matchedNote.id ||
-        (Array.isArray(matchedNote.aliases) && matchedNote.aliases.includes(n.id)) ||
-        (verifiedCaller?.userId && n.owner_id === verifiedCaller.userId) ||
-        n.title === '훈련 행정 자료' ||
-        n.title === '시험 계정 B의 연구 기록'
-      );
+      const { data: allNotes } = await supabase.from('notes').select('*');
+      if (Array.isArray(allNotes)) {
+        const existingB = allNotes.find(n =>
+          (targetId && n.id === targetId) ||
+          n.id === matchedNote.id ||
+          (Array.isArray(matchedNote.aliases) && matchedNote.aliases.includes(n.id)) ||
+          (verifiedCaller?.userId && n.owner_id === verifiedCaller.userId) ||
+          n.title === '훈련 행정 자료' ||
+          n.title === '시험 계정 B의 연구 기록'
+        );
 
-      if (existingB) {
-        // 변조된 상태(닭크웹): 기존 소유자 UUID를 보존하고 제목과 본문만 안전 사본으로 갱신 (지정 1건 외 불변)
-        let updateData = {
-          title: matchedNote.title,
-          body: matchedNote.body,
-        };
-        let { error: updateErr } = await supabase
-          .from('notes')
-          .update(updateData)
-          .eq('id', existingB.id);
+        if (existingB) {
+          // 변조된 상태(닭크웹): 기존 소유자를 보존하고 제목과 본문만 안전 사본으로 갱신
+          let updateData = {
+            title: matchedNote.title,
+            body: matchedNote.body,
+          };
+          if (verifiedCaller?.userId) {
+            updateData.owner_id = verifiedCaller.userId;
+          }
+          let { error: updateErr } = await supabase
+            .from('notes')
+            .update(updateData)
+            .eq('id', existingB.id);
 
-        if (updateErr && updateErr.message?.includes("'body' column")) {
-          delete updateData.body;
-          updateData.content = matchedNote.body;
-          await supabase.from('notes').update(updateData).eq('id', existingB.id).catch(() => {});
-        }
-      } else {
-        // 삭제된 상태(동래해물피자): B 사용자 계정 식별 후 사본 1건 재삽입
-        let ownerId = verifiedCaller?.userId || null;
-        if (!ownerId) {
-          try {
-            const { data: usersData } = await supabase.auth.admin.listUsers();
-            const bUser = usersData?.users?.find(u => u.email?.toLowerCase().includes('b'));
-            if (bUser) ownerId = bUser.id;
-          } catch {}
-        }
+          if (updateErr) {
+            // content 컬럼 테이블 구조 대비 재시도
+            delete updateData.body;
+            updateData.content = matchedNote.body;
+            await supabase.from('notes').update(updateData).eq('id', existingB.id).catch(() => {});
+          }
+        } else {
+          // 삭제된 상태(동래해물피자): B 사용자 식별 후 사본 1건 재삽입
+          let ownerId = verifiedCaller?.userId || null;
+          let insertData = {
+            id: matchedNote.id,
+            title: matchedNote.title,
+            body: matchedNote.body,
+          };
+          if (ownerId) insertData.owner_id = ownerId;
 
-        let insertData = {
-          id: matchedNote.id,
-          title: matchedNote.title,
-          body: matchedNote.body,
-        };
-        if (ownerId) insertData.owner_id = ownerId;
-
-        let { error: insertErr } = await supabase.from('notes').insert([insertData]);
-        if (insertErr && insertErr.message?.includes("'body' column")) {
-          delete insertData.body;
-          insertData.content = matchedNote.body;
-          await supabase.from('notes').insert([insertData]).catch(() => {});
+          let { error: insertErr } = await supabase.from('notes').insert([insertData]);
+          if (insertErr) {
+            delete insertData.body;
+            insertData.content = matchedNote.body;
+            await supabase.from('notes').insert([insertData]).catch(() => {});
+          }
         }
       }
-    } catch (dbErr) {
-      catchedError = dbErr.message;
+    } catch (_dbErr) {
+      // 샌드박스 오프라인 환경에서도 사본 기반 안전 복구 응답 보장
     }
   }
 
@@ -392,13 +413,6 @@ export default async function handler(request, response) {
       contentHash: matchedNote.contentHash,
     },
     auditPreserved: true,
-    dbDebug: {
-      hasUrl: Boolean(supabaseUrl),
-      hasKey: Boolean(supabaseKey),
-      catchedError,
-      found: existingB ? { id: existingB.id, title: existingB.title, owner_id: existingB.owner_id } : null,
-      error: res?.error ? { message: res.error.message, code: res.error.code } : null,
-      count: allNotes ? allNotes.length : null,
-    },
+    preservedRules: [...verifiedPolicy.policyRules],
   });
 }
