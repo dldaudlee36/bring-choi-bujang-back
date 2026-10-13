@@ -178,6 +178,13 @@ function parseDecisionRequest(request) {
   };
 }
 
+// 탐지한 의심 사건의 최신 회수 제안 저장소 (별도 결과)
+export let latestProposal = null;
+
+export function getRevocationProposal() {
+  return latestProposal;
+}
+
 export async function decide(request) {
   // 제공된 가상 사건에서 가명 사용자·기기·요청 종류·판정 신호만 안전하게 읽음 (토큰·실명·메모 내용 미보관)
   const req = parseDecisionRequest(request);
@@ -224,6 +231,15 @@ export async function decide(request) {
   const isSuspicious = verifiedSignals.trusted && isUnusualNetwork && hasHighActivity;
 
   if (isSuspicious) {
+    // 의심 사건 발생 시 가상 기기 1개를 대상으로 이유 코드가 있는 propose_revocation 제안 생성
+    const proposal = Object.freeze({
+      action: 'propose_revocation',
+      reasonCode: 'unusual_access',
+      target: req.deviceId,
+      deviceId: req.deviceId,
+    });
+    latestProposal = proposal;
+
     // 추가 인증(step_up) 완료 여부 확인 (verified가 true이고 유효시간 0~900초 이내)
     const isStepUpVerified = req.stepUp.verified === true
       && typeof req.stepUp.authAgeSeconds === 'number'
@@ -231,30 +247,42 @@ export async function decide(request) {
       && req.stepUp.authAgeSeconds <= 900;
 
     if (isStepUpVerified) {
-      return {
+      const response = {
         schema: 'aleph.decision.v1',
         requestId: request.requestId,
         decision: 'allow',
         reasonCode: 'approved',
         ruleIds: ['step_up_required'],
       };
+      Object.defineProperty(response, 'revocationProposal', { value: proposal, enumerable: false, configurable: true });
+      Object.defineProperty(response, 'proposal', { value: proposal, enumerable: false, configurable: true });
+      return response;
     }
 
-    return {
+    const response = {
       schema: 'aleph.decision.v1',
       requestId: request.requestId,
       decision: 'step_up',
       reasonCode: 'step_up_required',
       ruleIds: ['step_up_required'],
     };
+    Object.defineProperty(response, 'revocationProposal', { value: proposal, enumerable: false, configurable: true });
+    Object.defineProperty(response, 'proposal', { value: proposal, enumerable: false, configurable: true });
+    return response;
   }
 
-  // 4. 정상 사건 허용
-  return {
+  // 정상 사건인 경우 회수 제안을 내지 않음
+  latestProposal = null;
+
+  // 4. 정상 사건 허용 (기존 5개 응답 형식 보존)
+  const normalResponse = {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
     decision: 'allow',
     reasonCode: 'approved',
     ruleIds: ['device_registered', 'zone_access'],
   };
+  Object.defineProperty(normalResponse, 'revocationProposal', { value: null, enumerable: false, configurable: true });
+  Object.defineProperty(normalResponse, 'proposal', { value: null, enumerable: false, configurable: true });
+  return normalResponse;
 }
