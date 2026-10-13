@@ -155,43 +155,11 @@ function checkZoneAccess(request) {
   return { allowed: false, reason: 'zone_access_denied' };
 }
 
-/**
- * 반 엔진이 검증해 넘긴 계약 필드(가명 사용자·기기·요청 종류·판정 신호)만 정제하여 읽습니다.
- * 메모 내용·토큰·실명·비밀값은 저장하거나 출력하지 않습니다.
- */
-function parseDecisionRequest(request) {
-  return {
-    schema: request?.schema,
-    requestId: request?.requestId,
-    subjectId: typeof request?.subjectId === 'string' ? request.subjectId.trim() : '',
-    deviceId: typeof request?.deviceId === 'string' ? request.deviceId.trim() : '',
-    deviceRegistered: request?.deviceRegistered === true,
-    service: typeof request?.service === 'string' ? request.service.trim() : '',
-    method: typeof request?.method === 'string' ? request.method.trim().toUpperCase() : '',
-    path: typeof request?.path === 'string' ? request.path.trim() : '',
-    route: typeof request?.route === 'string' ? request.route.trim() : '',
-    queryLength: typeof request?.queryLength === 'number' ? request.queryLength : 0,
-    querySha256: typeof request?.querySha256 === 'string' ? request.querySha256 : '',
-    stepUp: request?.stepUp && typeof request.stepUp === 'object' ? request.stepUp : { verified: false, authAgeSeconds: null },
-    signals: parseVerifiedSignals(request),
-    recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
-  };
-}
-
-// 탐지한 의심 사건의 최신 회수 제안 저장소 (별도 결과)
-export let latestProposal = null;
-
-export function getRevocationProposal() {
-  return latestProposal;
-}
-
 export async function decide(request) {
-  // 제공된 가상 사건에서 가명 사용자·기기·요청 종류·판정 신호만 안전하게 읽음 (토큰·실명·메모 내용 미보관)
-  const req = parseDecisionRequest(request);
-
-  const hasLogin = req.subjectId.length > 0;
-  const hasDevice = req.deviceId.length > 0;
-  const isDeviceRegistered = req.deviceRegistered;
+  // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered) 검증
+  const hasLogin = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
+  const hasDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
+  const isDeviceRegistered = request?.deviceRegistered === true;
 
   // 1. 기본 기기 및 접속 자격 규칙 검증 (기존 device_registered 규칙 유지)
   if (!hasLogin || !hasDevice || !isDeviceRegistered) {
@@ -205,7 +173,7 @@ export async function decide(request) {
   }
 
   // 2. 8단계 구역 및 정확한 경로 검증 (zone_access 규칙)
-  const zoneCheck = checkZoneAccess(req);
+  const zoneCheck = checkZoneAccess(request);
   if (!zoneCheck.allowed) {
     return {
       schema: 'aleph.decision.v1',
@@ -217,72 +185,52 @@ export async function decide(request) {
   }
 
   // 3. 엔진이 검증한 가상 접속 정보의 출처 및 정황 검사 (7단계 step_up_required 규칙 유지)
-  const verifiedSignals = req.signals;
+  const verifiedSignals = parseVerifiedSignals(request);
 
-  // 평소와 다른 네트워크 (처음 보는 네트워크)
+  // 평소와 다른 시각(심야/새벽)
+  const isUnusualHour = verifiedSignals.hour !== null && (verifiedSignals.hour < 7 || verifiedSignals.hour > 21);
+  // 처음 보는 네트워크
   const isUnusualNetwork = verifiedSignals.network === 'unusual';
-  // 갑작스러운 다량 조회 사건 (recentEvents count >= 10 또는 burst/high_read/risk_signal)
+  // 갑자기 많은 자료를 읽는 가상 사건
   const hasHighActivity = Array.isArray(verifiedSignals.recentEvents) && verifiedSignals.recentEvents.some(
     e => (typeof e.count === 'number' && e.count >= 10) || e.kind === 'risk_signal' || e.kind === 'high_read' || e.kind === 'burst'
   );
 
-  // 평소와 다른 네트워크와 갑작스러운 다량 조회가 함께 나타날 때만 복합 의심 사건으로 판정
-  // (지역 하나만으로 확정하지 않으며, 출처가 검증된 엔진 신호일 때만 동작)
-  const isSuspicious = verifiedSignals.trusted && isUnusualNetwork && hasHighActivity;
+  // 평소와 다른 시각 + 낯선 네트워크 + 대량 조회 복합 이상 사건 확인
+  const isSuspicious = verifiedSignals.trusted && isUnusualHour && isUnusualNetwork && hasHighActivity;
 
   if (isSuspicious) {
-    // 의심 사건 발생 시 가상 기기 1개를 대상으로 이유 코드가 있는 propose_revocation 제안 생성
-    const proposal = Object.freeze({
-      action: 'propose_revocation',
-      reasonCode: 'unusual_access',
-      target: req.deviceId,
-      deviceId: req.deviceId,
-    });
-    latestProposal = proposal;
-
     // 추가 인증(step_up) 완료 여부 확인 (verified가 true이고 유효시간 0~900초 이내)
-    const isStepUpVerified = req.stepUp.verified === true
-      && typeof req.stepUp.authAgeSeconds === 'number'
-      && req.stepUp.authAgeSeconds >= 0
-      && req.stepUp.authAgeSeconds <= 900;
+    const isStepUpVerified = request?.stepUp?.verified === true
+      && typeof request?.stepUp?.authAgeSeconds === 'number'
+      && request.stepUp.authAgeSeconds >= 0
+      && request.stepUp.authAgeSeconds <= 900;
 
     if (isStepUpVerified) {
-      const response = {
+      return {
         schema: 'aleph.decision.v1',
         requestId: request.requestId,
         decision: 'allow',
         reasonCode: 'approved',
         ruleIds: ['step_up_required'],
       };
-      Object.defineProperty(response, 'revocationProposal', { value: proposal, enumerable: false, configurable: true });
-      Object.defineProperty(response, 'proposal', { value: proposal, enumerable: false, configurable: true });
-      return response;
     }
 
-    const response = {
+    return {
       schema: 'aleph.decision.v1',
       requestId: request.requestId,
       decision: 'step_up',
       reasonCode: 'step_up_required',
       ruleIds: ['step_up_required'],
     };
-    Object.defineProperty(response, 'revocationProposal', { value: proposal, enumerable: false, configurable: true });
-    Object.defineProperty(response, 'proposal', { value: proposal, enumerable: false, configurable: true });
-    return response;
   }
 
-  // 정상 사건인 경우 회수 제안을 내지 않음
-  latestProposal = null;
-
-  // 4. 정상 사건 허용 (기존 5개 응답 형식 보존)
-  const normalResponse = {
+  // 4. 정상 사건 허용
+  return {
     schema: 'aleph.decision.v1',
     requestId: request.requestId,
     decision: 'allow',
     reasonCode: 'approved',
     ruleIds: ['device_registered', 'zone_access'],
   };
-  Object.defineProperty(normalResponse, 'revocationProposal', { value: null, enumerable: false, configurable: true });
-  Object.defineProperty(normalResponse, 'proposal', { value: null, enumerable: false, configurable: true });
-  return normalResponse;
 }
