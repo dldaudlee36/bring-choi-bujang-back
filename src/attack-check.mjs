@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step !== 1 && config.step !== 2 && config.step !== 3 && config.step !== 4 && config.step !== 5 && config.step !== 6) {
+  if (config.step !== 1 && config.step !== 2 && config.step !== 3 && config.step !== 4 && config.step !== 5 && config.step !== 6 && config.step !== 7) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -333,6 +333,15 @@ export async function runAttackChecks(config) {
     expected: '원본 Supabase REST API 직접 쓰기 요청 시 401 Unauthorized로 거부됨',
     observed: origWriteResponse.status === 401 ? '원본 Supabase REST API 직접 POST 요청 시 401 거부 확인' : `원본 API 직접 쓰기가 차단되지 않음 (HTTP ${origWriteResponse.status})`,
   });
+
+  if (config.step === 7) {
+    // 7단계: 제공 엔진의 재로그인 시각 검증 계약이 부재하므로 실제 자료 차단은 미실행으로 기록 (토큰 원문 미기록)
+    results.push({
+      attackId: 'step_up_reauth_gate',
+      expected: '제공 엔진의 재로그인 시각 검증 계약 지원 시 재인증 전 차단 및 새 요청 허용 실측',
+      observed: '제공 엔진의 재로그인 시각 검증 계약 부재로 가상 사건 판정기 규칙만 시험하고 실제 자료 차단 점검은 미실행으로 보존',
+    });
+  }
 
   return results;
 }
