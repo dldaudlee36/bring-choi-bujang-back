@@ -155,11 +155,36 @@ function checkZoneAccess(request) {
   return { allowed: false, reason: 'zone_access_denied' };
 }
 
+/**
+ * 반 엔진이 검증해 넘긴 계약 필드(가명 사용자·기기·요청 종류·판정 신호)만 정제하여 읽습니다.
+ * 메모 내용·토큰·실명·비밀값은 저장하거나 출력하지 않습니다.
+ */
+function parseDecisionRequest(request) {
+  return {
+    schema: request?.schema,
+    requestId: request?.requestId,
+    subjectId: typeof request?.subjectId === 'string' ? request.subjectId.trim() : '',
+    deviceId: typeof request?.deviceId === 'string' ? request.deviceId.trim() : '',
+    deviceRegistered: request?.deviceRegistered === true,
+    service: typeof request?.service === 'string' ? request.service.trim() : '',
+    method: typeof request?.method === 'string' ? request.method.trim().toUpperCase() : '',
+    path: typeof request?.path === 'string' ? request.path.trim() : '',
+    route: typeof request?.route === 'string' ? request.route.trim() : '',
+    queryLength: typeof request?.queryLength === 'number' ? request.queryLength : 0,
+    querySha256: typeof request?.querySha256 === 'string' ? request.querySha256 : '',
+    stepUp: request?.stepUp && typeof request.stepUp === 'object' ? request.stepUp : { verified: false, authAgeSeconds: null },
+    signals: parseVerifiedSignals(request),
+    recentEvents: Array.isArray(request?.recentEvents) ? request.recentEvents : [],
+  };
+}
+
 export async function decide(request) {
-  // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered) 검증
-  const hasLogin = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
-  const hasDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
-  const isDeviceRegistered = request?.deviceRegistered === true;
+  // 제공된 가상 사건에서 가명 사용자·기기·요청 종류·판정 신호만 안전하게 읽음 (토큰·실명·메모 내용 미보관)
+  const req = parseDecisionRequest(request);
+
+  const hasLogin = req.subjectId.length > 0;
+  const hasDevice = req.deviceId.length > 0;
+  const isDeviceRegistered = req.deviceRegistered;
 
   // 1. 기본 기기 및 접속 자격 규칙 검증 (기존 device_registered 규칙 유지)
   if (!hasLogin || !hasDevice || !isDeviceRegistered) {
@@ -173,7 +198,7 @@ export async function decide(request) {
   }
 
   // 2. 8단계 구역 및 정확한 경로 검증 (zone_access 규칙)
-  const zoneCheck = checkZoneAccess(request);
+  const zoneCheck = checkZoneAccess(req);
   if (!zoneCheck.allowed) {
     return {
       schema: 'aleph.decision.v1',
@@ -185,7 +210,7 @@ export async function decide(request) {
   }
 
   // 3. 엔진이 검증한 가상 접속 정보의 출처 및 정황 검사 (7단계 step_up_required 규칙 유지)
-  const verifiedSignals = parseVerifiedSignals(request);
+  const verifiedSignals = req.signals;
 
   // 평소와 다른 시각(심야/새벽)
   const isUnusualHour = verifiedSignals.hour !== null && (verifiedSignals.hour < 7 || verifiedSignals.hour > 21);
@@ -201,10 +226,10 @@ export async function decide(request) {
 
   if (isSuspicious) {
     // 추가 인증(step_up) 완료 여부 확인 (verified가 true이고 유효시간 0~900초 이내)
-    const isStepUpVerified = request?.stepUp?.verified === true
-      && typeof request?.stepUp?.authAgeSeconds === 'number'
-      && request.stepUp.authAgeSeconds >= 0
-      && request.stepUp.authAgeSeconds <= 900;
+    const isStepUpVerified = req.stepUp.verified === true
+      && typeof req.stepUp.authAgeSeconds === 'number'
+      && req.stepUp.authAgeSeconds >= 0
+      && req.stepUp.authAgeSeconds <= 900;
 
     if (isStepUpVerified) {
       return {
