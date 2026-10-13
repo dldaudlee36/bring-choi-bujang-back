@@ -384,6 +384,19 @@ export async function runAttackChecks(config) {
         ? `기능 경로(/api/notes/export) 직접 접근 시 HTTP ${exportResponse.status} 거부 확인`
         : `기능 경로가 차단되지 않음 (HTTP ${exportResponse.status})`,
     });
+
+    // 점검 11: 타인/다른 구역 메모 직접 조회(GET) 시도 시 차단 확인 (갓김치사랑 방어)
+    const otherMemoResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000099', app), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    results.push({
+      attackId: 'direct_other_zone_read_blocked',
+      expected: '다른 구역 메모 직접 조회 요청 시 401, 403 또는 404로 거부됨',
+      observed: (otherMemoResponse.status === 401 || otherMemoResponse.status === 403 || otherMemoResponse.status === 404)
+        ? `다른 구역 메모 직접 조회 요청 시 HTTP ${otherMemoResponse.status} 거부 확인`
+        : `다른 구역 메모 직접 조회가 차단되지 않음 (HTTP ${otherMemoResponse.status})`,
+    });
   }
 
   return results;

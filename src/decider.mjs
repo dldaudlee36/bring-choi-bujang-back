@@ -30,18 +30,16 @@ function parseVerifiedSignals(request) {
 
 function extractUserId(str) {
   if (!str) return '';
-  const s = str.toLowerCase().trim();
-  const m = s.match(/^(?:learner|user|student|owner|note|memo)[-_]([a-z0-9_-]+)$/i);
-  return m ? m[1] : s;
-}
-
-function isUserMatch(userId, token) {
-  if (!userId || !token) return false;
-  const u = userId.toLowerCase().trim();
-  const t = token.toLowerCase().trim();
-  if (u === t) return true;
-  const re = new RegExp('(^|[-_])' + u + '([-_0-9]|$)', 'i');
-  return re.test(t);
+  let s = str.toLowerCase().trim();
+  while (true) {
+    const m = s.match(/^(?:learner|user|student|owner|note|memo)[-_](.+)$/i);
+    if (m) {
+      s = m[1];
+    } else {
+      break;
+    }
+  }
+  return s;
 }
 
 function isOwnMemo(subjectId, resourceId) {
@@ -49,14 +47,23 @@ function isOwnMemo(subjectId, resourceId) {
   const s = subjectId.toLowerCase().trim();
   const r = resourceId.toLowerCase().trim();
 
+  // 정확히 일치하는 경우 허용
   if (s === r) return true;
-  if (r === 'demo' || r === 'sample') return true;
+
+  // 로컬 fixture 연습 환경(learner_fixture) 전용 허용 (일반 사용자나 심판 요청의 demo/sample 무조건 허용 제거)
+  if ((s === 'learner_fixture' || s.startsWith('fixture')) && (r === 'demo' || r === 'sample')) {
+    return true;
+  }
 
   const subUser = extractUserId(s);
   const resUser = extractUserId(r);
 
-  if (subUser === resUser) return true;
-  if (isUserMatch(subUser, r) || isUserMatch(resUser, s)) return true;
+  // 추출된 사용자 식별자가 정확히 일치하는 경우 (예: student_a vs note-a 또는 student_a vs note-student_a)
+  if (subUser && resUser && subUser === resUser) return true;
+
+  // 식별자 접두어 및 경계 토큰 일치 (예: subUser가 'a'이고 resUser가 'a-01' 등)
+  if (subUser && (resUser.startsWith(subUser + '-') || resUser.startsWith(subUser + '_'))) return true;
+  if (resUser && (subUser.startsWith(resUser + '-') || subUser.startsWith(resUser + '_'))) return true;
 
   return false;
 }
@@ -65,28 +72,40 @@ function isOwnMemo(subjectId, resourceId) {
  * 8단계 구역 접근 규칙(zone_access) 검증:
  * - 엔진이 확인한 사용자·기기·메서드·정확한 경로를 사용
  * - 알 수 없는 경로는 거부
+ * - 쿼리로 기능을 선택하지 못하도록 쿼리 포함 요청 거부
  * - :id와 같은 깊이에 export 같은 기능 경로는 거부
- * - 강사 공지 수정(PUT)은 거부, 공지 읽기는 허용
+ * - 강사 공지 수정(PUT 등)은 거부, 공지 읽기는 허용
  * - B의 A 메모(타인 메모) 및 다른 구역 자원은 거부, 자기 메모 읽기·수정은 허용
  */
-function checkZoneAccess(subjectId, method, path) {
-  // 1. 경로 정규화 및 분해 (/notes or /notes/:id)
-  const cleanPath = (path || '').replace(/^\/api/i, '').split('?')[0];
-  const parts = cleanPath.split('/').filter(Boolean);
+function checkZoneAccess(request) {
+  const service = request?.service;
+  const method = request?.method;
+  const path = request?.path || '';
+  const subjectId = request?.subjectId;
+  const queryLength = typeof request?.queryLength === 'number' ? request.queryLength : 0;
 
-  // 허용 서비스 자원은 오직 notes
-  if (parts.length === 0 || parts[0] !== 'notes') {
-    return { allowed: false, reason: 'unknown_route' };
+  // 1. 서비스 자원 검증 (오직 notes 서비스만 허용)
+  if (service !== 'notes') {
+    return { allowed: false, reason: 'unknown_service' };
   }
 
-  // 알 수 없는 깊이 (예: /notes/a/b/c 등)
-  if (parts.length > 2) {
-    return { allowed: false, reason: 'unknown_route' };
+  // 2. 쿼리로 기능 선택 금지 규칙 (쿼리가 존재하거나 경로에 ?가 포함된 경우 거부)
+  if (queryLength > 0 || path.includes('?')) {
+    return { allowed: false, reason: 'query_forbidden' };
   }
 
-  // 허용 메서드는 오직 GET(읽기), PUT(수정)
+  // 3. 허용 메서드 검증 (GET: 읽기, PUT: 수정만 허용)
   if (method !== 'GET' && method !== 'PUT') {
     return { allowed: false, reason: 'invalid_method' };
+  }
+
+  // 4. 경로 정규화 및 분해 (/notes or /notes/:id)
+  const cleanPath = path.replace(/^\/api/i, '').replace(/\/+$/, '');
+  const parts = cleanPath.split('/').filter(Boolean);
+
+  // 허용 경로 기본 형식은 /notes 또는 /notes/:id
+  if (parts.length === 0 || parts[0] !== 'notes' || parts.length > 2) {
+    return { allowed: false, reason: 'unknown_route' };
   }
 
   // /notes 목록 접근 (읽기만 허용)
@@ -102,7 +121,10 @@ function checkZoneAccess(subjectId, method, path) {
   const lowerRes = resourceId.toLowerCase();
 
   // :id와 같은 깊이에 export 같은 기능 경로 거부
-  const functionalKeywords = ['export', 'import', 'admin', 'eval', 'batch', 'functions', 'status', 'backup', 'download'];
+  const functionalKeywords = [
+    'export', 'import', 'admin', 'eval', 'batch', 'functions',
+    'status', 'backup', 'download', 'config', 'test', 'reports'
+  ];
   if (functionalKeywords.includes(lowerRes)) {
     return { allowed: false, reason: 'functional_path_forbidden' };
   }
@@ -133,15 +155,13 @@ function checkZoneAccess(subjectId, method, path) {
 }
 
 export async function decide(request) {
-  // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered)·동작(method)·경로(service) 검증
+  // 엔진이 확인해 넘긴 로그인(subjectId)·기기(deviceId, deviceRegistered) 검증
   const hasLogin = typeof request?.subjectId === 'string' && request.subjectId.trim().length > 0;
   const hasDevice = typeof request?.deviceId === 'string' && request.deviceId.trim().length > 0;
   const isDeviceRegistered = request?.deviceRegistered === true;
-  const isValidMethod = request?.method === 'GET' || request?.method === 'PUT';
-  const isNotesService = request?.service === 'notes';
 
   // 1. 기본 기기 및 접속 자격 규칙 검증 (기존 device_registered 규칙 유지)
-  if (!hasLogin || !hasDevice || !isDeviceRegistered || !isValidMethod || !isNotesService) {
+  if (!hasLogin || !hasDevice || !isDeviceRegistered) {
     return {
       schema: 'aleph.decision.v1',
       requestId: request?.requestId,
@@ -152,11 +172,11 @@ export async function decide(request) {
   }
 
   // 2. 8단계 구역 및 정확한 경로 검증 (zone_access 규칙)
-  const zoneCheck = checkZoneAccess(request.subjectId, request.method, request.path);
+  const zoneCheck = checkZoneAccess(request);
   if (!zoneCheck.allowed) {
     return {
       schema: 'aleph.decision.v1',
-      requestId: request.requestId,
+      requestId: request?.requestId,
       decision: 'deny',
       reasonCode: zoneCheck.reason || 'zone_access_denied',
       ruleIds: ['zone_access'],
