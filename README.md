@@ -32,6 +32,11 @@
   - SQL 구문 삽입, 스크립트 태그 삽입, 상위 경로 이동(`../`) 등 명확한 공격은 차단(`block`, 8건), 단발성/수업명 등 애매한 시도는 경보(`alert`, 9건), 정상 활동은 기록(`record`, 9건)으로 판정합니다.
   - 차단 대상 IP는 ZTNA 판정기(`src/decider.mjs`)에 만료 시각과 근거 경보 번호가 포함된 거부 규칙으로 연동되어 우선 차단되며, 애매한 시도는 `xdr/alerts.log`에 누적 기록됩니다.
 
+* **보너스 작전 3: 알려진 취약점(Log4Shell, CVE-2021-44228) 악용 탐지 및 ZTNA 거부 규칙 연동 (XDR)**:
+  - `xdr/fixtures/known-cve.json`의 가상 Wazuh 경보(MITRE ATT&CK T1190)를 분석하는 `xdr/known-cve/decide.mjs`, `patterns.json`, `respond.mjs` 및 `read-alerts.mjs`를 구현했습니다.
+  - 요청 머리글이나 주소 인자에 JNDI 원격 조회 식(`${jndi:ldap://...}`)이 포함된 명확한 취약점 공격은 차단(`block`, 8건), 단순 명칭 검색 및 점검 흔적은 경보(`alert`, 8건), 정상 활동은 기록(`record`, 8건)으로 판정합니다.
+  - 차단 대상 8개 공격 IP는 만료 시각(`2026-10-18T00:00:00.000Z`)과 경보 ID가 포함된 ZTNA 거부 규칙(`xdr/deny-rules.json`)에 연동되며, 알림 시도는 `xdr/alerts.log`에 누적 기록됩니다. 정상 사용자는 거부 규칙에 등록되지 않습니다.
+
 * **6·7단계: 등록 기기 통제 및 이상 접속 재인증 (`device_registered`, `step_up_required`)**:
   - `src/decider.mjs`는 로그인 주체(`subjectId`), 기기 ID(`deviceId`), 등록 상태(`deviceRegistered === true`), 읽기 동작(`method === 'GET'`), 자료실 경로(`service === 'notes'`)를 모두 만족할 때만 정상 요청을 허용합니다. 미등록 기기는 `deny` (`device_not_registered`)로 거부합니다.
   - 평소와 다른 심야 시각 + 낯선 네트워크 + 대량 조회의 복합 이상 사건 발생 시 지역(`region: 'foreign'`) 하나만으로 영구 차단하지 않고 추가 인증(`step_up`, 이유 코드 `step_up_required`)으로 안내합니다.
@@ -58,6 +63,10 @@
 
    # 웹 주입 공격 분석
    npm run xdr:run -- web-injection
+
+   # 알려진 취약점(CVE-2021-44228) 악용 분석 및 대응 연동
+   npm run xdr:run -- known-cve
+   node xdr/known-cve/respond.mjs
    ```
 3. **7단계 판정기 및 복합 이상 사건 확인 (가상 요청 연습)**:
    ```bash

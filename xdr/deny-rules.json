@@ -160,5 +160,77 @@
     "expiresAt": "2026-10-09T02:40:00.000Z",
     "reason": "요청 인자 안의 SQL 구문 반복",
     "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-01",
+    "alertId": "kc-01",
+    "ip": "203.0.113.10",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-02",
+    "alertId": "kc-02",
+    "ip": "203.0.113.10",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-03",
+    "alertId": "kc-03",
+    "ip": "198.51.100.16",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-04",
+    "alertId": "kc-04",
+    "ip": "192.0.2.16",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-05",
+    "alertId": "kc-05",
+    "ip": "203.0.113.24",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "알려진 취약점 점검 도구 흔적과 악용 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-06",
+    "alertId": "kc-06",
+    "ip": "198.51.100.24",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-07",
+    "alertId": "kc-07",
+    "ip": "192.0.2.24",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
+  },
+  {
+    "ruleId": "xdr_deny_kc-08",
+    "alertId": "kc-08",
+    "ip": "203.0.113.31",
+    "user": null,
+    "expiresAt": "2026-10-18T00:00:00.000Z",
+    "reason": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "action": "deny"
   }
 ]

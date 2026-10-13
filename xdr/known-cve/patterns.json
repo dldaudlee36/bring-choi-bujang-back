@@ -1,0 +1,12 @@
+[
+  {
+    "name": "요청 머리글 또는 인자 안의 JNDI 원격 조회 구문",
+    "condition": "HTTP 요청 머리글(User-Agent 등)이나 URL 쿼리 인자에 ${jndi:ldap://...} 형태의 원격 조회 구문이 포함된 경우",
+    "rationale": "MITRE ATT&CK T1190(Exploit Public-Facing Application): CVE-2021-44228(Log4Shell) 취약점을 통해 원격 임의 코드를 실행하려는 공격 신호입니다."
+  },
+  {
+    "name": "알려진 취약점 점검 도구 흔적과 악용 구문",
+    "condition": "상태 확인이나 점검 인자(health, probe 등)에 알려진 CVE-2021-44228 점검 도구의 원격 조회 구문이 동반된 경우",
+    "rationale": "MITRE ATT&CK T1190(Exploit Public-Facing Application): 자동화된 취약점 점검 도구로 시스템의 Log4j 취약점 노출 여부를 능동 탐색하고 악용하려는 신호입니다."
+  }
+]
