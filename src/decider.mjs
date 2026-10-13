@@ -99,21 +99,13 @@ function checkZoneAccess(request) {
     return { allowed: false, reason: 'invalid_method' };
   }
 
-  // 4. 경로 정규화 및 분해 (/notes or /notes/:id)
+  // 4. 경로 정규화 및 분해 (/notes/:id 필수)
   const cleanPath = path.replace(/^\/api/i, '').replace(/\/+$/, '');
   const parts = cleanPath.split('/').filter(Boolean);
 
-  // 허용 경로 기본 형식은 /notes 또는 /notes/:id
-  if (parts.length === 0 || parts[0] !== 'notes' || parts.length > 2) {
-    return { allowed: false, reason: 'unknown_route' };
-  }
-
-  // /notes 목록 접근 (읽기만 허용)
-  if (parts.length === 1) {
-    if (method !== 'GET') {
-      return { allowed: false, reason: 'invalid_method' };
-    }
-    return { allowed: true };
+  // 허용 경로 기본 형식은 /notes/:id (자료 ID 필수 지정, 쿼리 또는 자원 ID 없는 목록 조회 차단)
+  if (parts.length !== 2 || parts[0] !== 'notes') {
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // /notes/:id 단건 접근
@@ -126,7 +118,7 @@ function checkZoneAccess(request) {
     'status', 'backup', 'download', 'config', 'test', 'reports'
   ];
   if (functionalKeywords.includes(lowerRes)) {
-    return { allowed: false, reason: 'functional_path_forbidden' };
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // 강사 공지 구역 (notice, instructor, announce 등)
@@ -134,7 +126,7 @@ function checkZoneAccess(request) {
   if (isNotice) {
     // 일반 학생의 공지 수정(PUT 등)은 거부
     if (method !== 'GET') {
-      return { allowed: false, reason: 'notice_update_forbidden' };
+      return { allowed: false, reason: 'zone_access_denied' };
     }
     // 공지 읽기(GET)는 허용
     return { allowed: true };
@@ -142,7 +134,7 @@ function checkZoneAccess(request) {
 
   // 다른 구역 명시적 키워드 차단
   if (lowerRes.includes('other') || lowerRes.includes('foreign') || lowerRes.includes('diff_zone')) {
-    return { allowed: false, reason: 'other_zone_forbidden' };
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // 본인 소유 메모인 경우만 허용 (Zero-Trust 기본 거부 원칙)
@@ -151,7 +143,7 @@ function checkZoneAccess(request) {
   }
 
   // 본인 메모가 아닌 모든 자원은 타인 메모/타 구역 접근으로 거부
-  return { allowed: false, reason: 'cross_user_forbidden' };
+  return { allowed: false, reason: 'zone_access_denied' };
 }
 
 export async function decide(request) {
@@ -178,7 +170,7 @@ export async function decide(request) {
       schema: 'aleph.decision.v1',
       requestId: request?.requestId,
       decision: 'deny',
-      reasonCode: zoneCheck.reason || 'zone_access_denied',
+      reasonCode: 'zone_access_denied',
       ruleIds: ['zone_access'],
     };
   }
