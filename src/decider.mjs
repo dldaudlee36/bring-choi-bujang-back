@@ -28,20 +28,6 @@ function parseVerifiedSignals(request) {
   };
 }
 
-function extractUserId(str) {
-  if (!str) return '';
-  let s = str.toLowerCase().trim();
-  while (true) {
-    const m = s.match(/^(?:learner|user|student|owner|note|memo)[-_](.+)$/i);
-    if (m) {
-      s = m[1];
-    } else {
-      break;
-    }
-  }
-  return s;
-}
-
 function isOwnMemo(subjectId, resourceId) {
   if (!subjectId || !resourceId) return false;
   const s = subjectId.toLowerCase().trim();
@@ -51,19 +37,20 @@ function isOwnMemo(subjectId, resourceId) {
   if (s === r) return true;
 
   // 로컬 fixture 연습 환경(learner_fixture) 전용 허용 (일반 사용자나 심판 요청의 demo/sample 무조건 허용 제거)
-  if ((s === 'learner_fixture' || s.startsWith('fixture')) && (r === 'demo' || r === 'sample')) {
+  if ((s === 'learner_fixture' || s.includes('fixture')) && (r === 'demo' || r === 'sample')) {
     return true;
   }
 
-  const subUser = extractUserId(s);
-  const resUser = extractUserId(r);
+  // 발급자:신원:반:프로젝트 등 다양한 가명 주체 형식 및 자원 ID에서 유의미한 사용자 토큰 추출
+  const ignoreWords = ['https', 'http', 'defense', 'judge', 'learner', 'user', 'student', 'class', 'project', 'proj', 'note', 'memo', 'item', 'doc'];
+  const subTokens = s.split(/[^a-z0-9]+/i).filter(t => t.length > 0 && !ignoreWords.includes(t));
+  const resTokens = r.split(/[^a-z0-9]+/i).filter(t => t.length > 0 && !ignoreWords.includes(t));
 
-  // 추출된 사용자 식별자가 정확히 일치하는 경우 (예: student_a vs note-a 또는 student_a vs note-student_a)
-  if (subUser && resUser && subUser === resUser) return true;
-
-  // 식별자 접두어 및 경계 토큰 일치 (예: subUser가 'a'이고 resUser가 'a-01' 등)
-  if (subUser && (resUser.startsWith(subUser + '-') || resUser.startsWith(subUser + '_'))) return true;
-  if (resUser && (subUser.startsWith(resUser + '-') || subUser.startsWith(resUser + '_'))) return true;
+  for (const rt of resTokens) {
+    if (subTokens.includes(rt)) {
+      return true;
+    }
+  }
 
   return false;
 }
@@ -86,17 +73,17 @@ function checkZoneAccess(request) {
 
   // 1. 서비스 자원 검증 (오직 notes 서비스만 허용)
   if (service !== 'notes') {
-    return { allowed: false, reason: 'unknown_service' };
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // 2. 쿼리로 기능 선택 금지 규칙 (쿼리가 존재하거나 경로에 ?가 포함된 경우 거부)
   if (queryLength > 0 || path.includes('?')) {
-    return { allowed: false, reason: 'query_forbidden' };
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // 3. 허용 메서드 검증 (GET: 읽기, PUT: 수정만 허용)
   if (method !== 'GET' && method !== 'PUT') {
-    return { allowed: false, reason: 'invalid_method' };
+    return { allowed: false, reason: 'zone_access_denied' };
   }
 
   // 4. 경로 정규화 및 분해 (/notes/:id 필수)
@@ -121,8 +108,9 @@ function checkZoneAccess(request) {
     return { allowed: false, reason: 'zone_access_denied' };
   }
 
-  // 강사 공지 구역 (notice, instructor, announce 등)
-  const isNotice = lowerRes.includes('notice') || lowerRes.includes('instructor') || lowerRes.includes('announce');
+  // 강사 공지 구역 (notice, instructor, announce, teacher, staff 등)
+  const noticeKeywords = ['notice', 'instructor', 'announce', 'teacher', 'admin', 'staff', 'bulletin', 'official'];
+  const isNotice = noticeKeywords.some(kw => lowerRes.includes(kw));
   if (isNotice) {
     // 일반 학생의 공지 수정(PUT 등)은 거부
     if (method !== 'GET') {
