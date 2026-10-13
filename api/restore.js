@@ -387,5 +387,9 @@ export default async function handler(request, response) {
       contentHash: matchedNote.contentHash,
     },
     auditPreserved: true,
+    dbDebug: {
+      found: existingB ? { id: existingB.id, title: existingB.title, owner_id: existingB.owner_id } : null,
+      rows: allNotes?.map(n => ({ id: n.id, title: n.title, owner_id: n.owner_id })),
+    },
   });
 }
