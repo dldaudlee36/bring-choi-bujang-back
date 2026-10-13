@@ -212,17 +212,16 @@ export async function decide(request) {
   // 3. 엔진이 검증한 가상 접속 정보의 출처 및 정황 검사 (7단계 step_up_required 규칙 유지)
   const verifiedSignals = req.signals;
 
-  // 평소와 다른 시각(심야/새벽)
-  const isUnusualHour = verifiedSignals.hour !== null && (verifiedSignals.hour < 7 || verifiedSignals.hour > 21);
-  // 처음 보는 네트워크
+  // 평소와 다른 네트워크 (처음 보는 네트워크)
   const isUnusualNetwork = verifiedSignals.network === 'unusual';
-  // 갑자기 많은 자료를 읽는 가상 사건
+  // 갑작스러운 다량 조회 사건 (recentEvents count >= 10 또는 burst/high_read/risk_signal)
   const hasHighActivity = Array.isArray(verifiedSignals.recentEvents) && verifiedSignals.recentEvents.some(
     e => (typeof e.count === 'number' && e.count >= 10) || e.kind === 'risk_signal' || e.kind === 'high_read' || e.kind === 'burst'
   );
 
-  // 평소와 다른 시각 + 낯선 네트워크 + 대량 조회 복합 이상 사건 확인
-  const isSuspicious = verifiedSignals.trusted && isUnusualHour && isUnusualNetwork && hasHighActivity;
+  // 평소와 다른 네트워크와 갑작스러운 다량 조회가 함께 나타날 때만 복합 의심 사건으로 판정
+  // (지역 하나만으로 확정하지 않으며, 출처가 검증된 엔진 신호일 때만 동작)
+  const isSuspicious = verifiedSignals.trusted && isUnusualNetwork && hasHighActivity;
 
   if (isSuspicious) {
     // 추가 인증(step_up) 완료 여부 확인 (verified가 true이고 유효시간 0~900초 이내)
