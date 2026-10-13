@@ -304,6 +304,7 @@ export default async function handler(request, response) {
   let allNotes = null;
   let existingB = null;
   let res = null;
+  let catchedError = null;
 
   if (supabaseUrl && supabaseKey) {
     try {
@@ -364,8 +365,8 @@ export default async function handler(request, response) {
           await supabase.from('notes').insert([insertData]).catch(() => {});
         }
       }
-    } catch (_dbErr) {
-      // Supabase 연결 불가 환경에서도 안전 복구 응답 보장
+    } catch (dbErr) {
+      catchedError = dbErr.message;
     }
   }
 
@@ -392,10 +393,12 @@ export default async function handler(request, response) {
     },
     auditPreserved: true,
     dbDebug: {
+      hasUrl: Boolean(supabaseUrl),
+      hasKey: Boolean(supabaseKey),
+      catchedError,
       found: existingB ? { id: existingB.id, title: existingB.title, owner_id: existingB.owner_id } : null,
       error: res?.error ? { message: res.error.message, code: res.error.code } : null,
       count: allNotes ? allNotes.length : null,
-      rows: allNotes?.map(n => ({ id: n.id, title: n.title, owner_id: n.owner_id })),
     },
   });
 }
