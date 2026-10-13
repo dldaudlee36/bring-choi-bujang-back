@@ -28,28 +28,52 @@ function parseVerifiedSignals(request) {
   };
 }
 
+function cleanIdentifier(id) {
+  if (!id) return '';
+  let s = id.toLowerCase().trim();
+  while (true) {
+    const next = s.replace(/^(?:note|memo|learner|student|user|owner|identity)[-_]/i, '');
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
 function isOwnMemo(subjectId, resourceId) {
   if (!subjectId || !resourceId) return false;
   const s = subjectId.toLowerCase().trim();
   const r = resourceId.toLowerCase().trim();
 
-  // 정확히 일치하는 경우 허용
+  // 1. 정확한 문자열 일치
   if (s === r) return true;
 
-  // 로컬 fixture 연습 환경(learner_fixture) 전용 허용 (일반 사용자나 심판 요청의 demo/sample 무조건 허용 제거)
-  if ((s === 'learner_fixture' || s.includes('fixture')) && (r === 'demo' || r === 'sample')) {
+  // 2. 로컬 fixture 연습 환경(learner_fixture) 전용 허용 (오직 learner_fixture 본인만 demo 허용)
+  if (s === 'learner_fixture' && (r === 'demo' || r === 'sample')) {
     return true;
   }
 
-  // 발급자:신원:반:프로젝트 등 다양한 가명 주체 형식 및 자원 ID에서 유의미한 사용자 토큰 추출
-  const ignoreWords = ['https', 'http', 'defense', 'judge', 'learner', 'user', 'student', 'class', 'project', 'proj', 'note', 'memo', 'item', 'doc'];
-  const subTokens = s.split(/[^a-z0-9]+/i).filter(t => t.length > 0 && !ignoreWords.includes(t));
-  const resTokens = r.split(/[^a-z0-9]+/i).filter(t => t.length > 0 && !ignoreWords.includes(t));
+  // 타인/다른 구역 명시적 키워드가 있으면 즉시 거부
+  if (r.includes('other') || r.includes('foreign') || r.includes('gatkimchi') || r.includes('kimchi') || r.includes('diff_zone')) {
+    return false;
+  }
 
-  for (const rt of resTokens) {
-    if (subTokens.includes(rt)) {
-      return true;
-    }
+  // 3. 접두어 제거 후 순수 신원 비교 (예: student_a vs note-a, learner_a vs note-student_a)
+  const cleanSub = cleanIdentifier(s);
+  const cleanRes = cleanIdentifier(r);
+
+  if (cleanSub && cleanRes && cleanSub === cleanRes) {
+    return true;
+  }
+
+  // 4. 가명 주체 구조 (발급자:신원:반:프로젝트 등 콜론/슬래시로 분리된 세그먼트 중 신원 일치)
+  const subSegments = s.split(/[:/]/).map(cleanIdentifier).filter(Boolean);
+  if (cleanRes && subSegments.includes(cleanRes)) {
+    return true;
+  }
+
+  // 5. 신원 접미 번호 패턴 (예: cleanSub가 'a'이고 cleanRes가 'a-01' 등, 경계 '-' 또는 '_'로 구분된 경우만)
+  if (cleanSub && (cleanRes.startsWith(cleanSub + '-') || cleanRes.startsWith(cleanSub + '_'))) {
+    return true;
   }
 
   return false;
@@ -108,20 +132,17 @@ function checkZoneAccess(request) {
     return { allowed: false, reason: 'zone_access_denied' };
   }
 
-  // 강사 공지 구역 (notice, instructor, announce, teacher, staff 등)
-  const noticeKeywords = ['notice', 'instructor', 'announce', 'teacher', 'admin', 'staff', 'bulletin', 'official'];
-  const isNotice = noticeKeywords.some(kw => lowerRes.includes(kw));
+  // 강사 공지 구역 (notice, instructor) - 학생의 공지 수정(PUT 등)은 거부, 공지 읽기(GET)만 허용
+  const isNotice = lowerRes.startsWith('notice') || lowerRes.includes('instructor');
   if (isNotice) {
-    // 일반 학생의 공지 수정(PUT 등)은 거부
     if (method !== 'GET') {
       return { allowed: false, reason: 'zone_access_denied' };
     }
-    // 공지 읽기(GET)는 허용
     return { allowed: true };
   }
 
   // 다른 구역 명시적 키워드 차단
-  if (lowerRes.includes('other') || lowerRes.includes('foreign') || lowerRes.includes('diff_zone')) {
+  if (lowerRes.includes('other') || lowerRes.includes('foreign') || lowerRes.includes('diff_zone') || lowerRes.includes('gatkimchi')) {
     return { allowed: false, reason: 'zone_access_denied' };
   }
 
