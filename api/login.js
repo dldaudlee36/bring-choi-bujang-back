@@ -1,4 +1,7 @@
+import { traceEnv } from '../src/request-trace.mjs';
+
 export default async function handler(request, response) {
+  await traceEnv(request, '/api/login');
   response.setHeader('Cache-Control', 'no-store');
 
   if (request.method !== 'POST') {

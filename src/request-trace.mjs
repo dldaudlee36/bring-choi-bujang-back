@@ -34,3 +34,14 @@ export function entryHint(request) {
   const h = request.headers ?? {};
   return `url=${String(request.url ?? '').slice(0, 110)} auth=${Boolean(h.authorization)} host=${String(h.host ?? '').slice(0, 60)} ua=${String(h['user-agent'] ?? '').slice(0, 40)}`;
 }
+
+// db 클라이언트가 없는 단순 API(login 등)용. 환경변수로 클라이언트를 만들어 진입만 기록한다.
+export async function traceEnv(request, route) {
+  try {
+    const url = process.env.SUPABASE_URL; const key = process.env.SUPABASE_SECRET_KEY;
+    if (!url || !key) return;
+    const { createClient } = await import('@supabase/supabase-js');
+    const db = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    await trace(db, { route, method: request.method, kind: 'entry', reason: entryHint(request) });
+  } catch { /* 무시 */ }
+}
