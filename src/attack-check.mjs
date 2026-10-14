@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step < 1 || config.step > 10) {
+  if (config.step < 1 || config.step > 11) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -424,6 +424,62 @@ export async function runAttackChecks(config) {
       attackId: 'unauthenticated_restore',
       expected: 'HTTP 401; recovery requires verified judge B login',
       observed: `Actual POST /api/notes/aabbccdd-1234-4567-89ab-123456789abc/restore: HTTP ${restoreResponse.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+    });
+  }
+
+  if (config.step >= 11) {
+    // 점검 14: PWA 웹앱 manifest 설정 확인
+    const manifestRes = await fetch(new URL('/manifest.json', app), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+      headers: { Accept: 'application/json' },
+    });
+    let manifestData;
+    try { manifestData = await manifestRes.json(); } catch {}
+    const manifestPass = manifestRes.status === 200
+      && manifestData?.name === 'BYTE BACK 내 자료실'
+      && manifestData?.start_url === '/'
+      && manifestData?.display === 'standalone';
+    results.push({
+      attackId: 'pwa_manifest',
+      expected: 'HTTP 200; vault app manifest',
+      observed: `Actual GET /manifest.json: HTTP ${manifestRes.status}; ${manifestPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+    });
+
+    // 점검 15: 미등록 기기 상태 확인 (approved: false)
+    const deviceStatusRes = await fetch(new URL('/api/device/status', app), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+      headers: { Accept: 'application/json' },
+    });
+    let statusData;
+    try { statusData = await deviceStatusRes.json(); } catch {}
+    const statusPass = deviceStatusRes.status === 200
+      && statusData?.approved === false
+      && statusData?.reason === 'device_not_registered';
+    results.push({
+      attackId: 'device_unapproved',
+      expected: 'HTTP 200; approved=false; no materials',
+      observed: `Actual GET /api/device/status: HTTP ${deviceStatusRes.status}; ${statusPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+    });
+
+    // 점검 16: 기기 승인 계약 부재 시 명시적 501 반환 확인
+    const deviceReqRes = await fetch(new URL('/api/device/request', app), {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+      headers: { Accept: 'application/json' },
+    });
+    let reqData;
+    try { reqData = await deviceReqRes.json(); } catch {}
+    const reqPass = deviceReqRes.status === 501
+      && reqData?.accepted === false
+      && reqData?.approved === false
+      && reqData?.reason === 'device_approval_contract_unavailable';
+    results.push({
+      attackId: 'device_request_unavailable',
+      expected: 'HTTP 501; accepted=false; missing engine approval contract',
+      observed: `Actual POST /api/device/request: HTTP ${deviceReqRes.status}; ${reqPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
     });
   }
 
