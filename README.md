@@ -5,6 +5,31 @@
 
 ---
 
+## 10단계 복구 확인 결과 (사본 일치 · 복구 뒤 재시험)
+
+확인 기준 커밋: `e0435f3`. 아래 명령은 이 커밋에서 실제로 실행한 결과이며, 실행하지 않은 시험은 미실행으로 적었습니다.
+
+### 사본 일치를 어떻게 확인하나
+
+- 사본: 메모가 처음 만들어질 때 DB 트리거(`capture_note_original`)가 `note_restore_backups`에 제목·본문·내용 지문을 한 번만 남깁니다. 이후 수정(PUT)은 사본을 바꾸지 않습니다. 트리거 설치 전에 있던 메모는 `db/baseline-seed-existing-notes.sql`로 한 번 사본을 채웠고, 출처를 `baseline_verified`로 구분합니다. 사본 표는 서버(service_role)도 읽기만 가능하고 수정·삭제 권한이 없습니다.
+- 지문: `sha256(UTF-8 "제목바이트수:" + 제목 + 본문)`. 서버(`src/restore-api.mjs`의 `noteHash`)와 DB 함수(`restore_verified_note`)가 같은 방식으로 계산합니다.
+- 복구(`POST /api/restore/:noteId`, 같은 처리기가 `POST /api/notes/:id/restore`도 받음) 때 서버가 본인 소유 사본을 직접 읽고 지문과 정책 지문을 다시 계산해 저장값과 같을 때만 복원합니다. 복원한 메모는 다시 읽어 ID·소유자·내용 지문이 사본과 같은지 한 번 더 대조하고, 다르면 409(`backup_unverified` / `restore_mismatch`)로 멈춥니다. 응답의 `contentSha256`이 사본 지문입니다.
+- 요청 본문과 쿼리의 내용·소유자 값은 읽지 않습니다. 쿼리의 `noteId`는 경로의 ID와 같은지만 확인합니다. 그래서 복구 내용을 요청으로 끼워 넣을 수 없습니다.
+
+### 복구 뒤 1~9단계 다시 확인한 결과
+
+| 순서 | 확인 | 정상(허용되어야 함) | 금지(거부되어야 함) | 실행 여부 · 실제 결과 |
+|---|---|---|---|---|
+| 1 | 10단계 사본 일치 | 변조 메모 복구 200·`reverted`, 삭제 메모 200·`recreated`, `contentSha256` = 원본 지문 | 사본 없음 404, 남의 사본 404, 사본 지문 불일치 409, 비인증 401, 복구 뒤 재대조 불일치 409 | `npm run test:r10` 실행 · pass 8 / fail 0 (가짜 토큰·메모리 DB 사용, 심판 판정 아님) |
+| 2 | 1~5단계 공개 자료·로그인·원본 API | 로그인 사용자의 자기 메모 CRUD | `/data.json` 메모 없음, 토큰 없는 `/api/notes` 401, 원본 API 직접 접근 거부 | `npm run test:r5` 실행 · pass 2 / fail 0 |
+| 3 | 6~7단계 기기·이상 접속 | 등록 기기 정상 요청 `allow` | 미등록 기기 `deny`, 복합 이상 `step_up` | `npm run decider:test` 4건 통과, `npm run fixture:7` 정상 `allow`·복합 이상 `step_up` |
+| 4 | 8단계 구역 | 본인 메모 `allow` | 남의 메모·공지 수정·기능 경로 `deny` | `npm run decider:test` 실행 · 통과 |
+| 5 | 9단계 탐지 | 120건 이하 `observe` | 10분 121건 이상 `propose_revocation` | `npm run detect:test` 6건 통과 |
+| 6 | 배포된 복구 경로 (비인증) | 없음 | 토큰 없는 `POST /api/restore/:noteId`와 `POST /api/notes/:id/restore`는 401 `login_required`, GET은 405 | 배포 주소에 직접 요청해 확인 (커밋 `e0435f3` 배포 후) |
+| 7 | 배포된 복구 경로 (시험 계정 B로 실제 변조→복구) | 200, 지문 일치 | 없음 | 미실행: 시험 계정 B 토큰이 없어 직접 보내지 않았습니다. 이 항목은 위 1번의 단위 시험으로만 확인했습니다. |
+
+---
+
 ## 📌 현재 단계: 10단계 (백업에서 자료실을 되살립니다) · 이전 단계 기능 유지
 
 ### 1. 동작 방식 및 현재 작동하는 기능
