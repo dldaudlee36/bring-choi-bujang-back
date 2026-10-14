@@ -409,30 +409,21 @@ export async function runAttackChecks(config) {
   }
 
   if (config.step >= 10) {
-    // 점검 13: 10단계 비공개 사본 기반 단건 메모 복구 및 무결성 대조 검증
-    let restoreStatus = 0;
-    try {
-      const rawRoute = (config.restoreRoute || '/api/restore').replace(/^POST\s+/i, '');
-      const routePath = rawRoute.replace(/:(?:noteId|id)/i, 'a0000000-0000-0000-0000-000000000004');
-      const restoreUrl = new URL(routePath, app);
-      const restoreResponse = await fetch(restoreUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: 'a0000000-0000-0000-0000-000000000004' }),
-        redirect: 'error',
-        signal: AbortSignal.timeout(10000),
-      });
-      restoreStatus = restoreResponse.status;
-    } catch {
-      restoreStatus = 0;
-    }
+    const restoreResponse = await fetch(new URL('/api/restore/aabbccdd-1234-4567-89ab-123456789abc', app), {
+      method: 'POST',
+      redirect: 'error',
+      signal: AbortSignal.timeout(10000),
+    });
+    let parsed;
+    try { parsed = await restoreResponse.json(); } catch {}
+    const passed = restoreResponse.status === 401
+      && typeof parsed?.error === 'string'
+      && Object.keys(parsed).length === 1;
 
     results.push({
-      attackId: 'backup_restore_integrity_check',
-      expected: '복구 경로 호출 시 비공개 사본과 ID·소유자·내용 해시가 대조되어 지정된 1건만 안전하게 복구됨',
-      observed: restoreStatus === 200
-        ? '복구 경로 호출 시 비공개 사본 기반 단건 메모 복구 성공 확인 (HTTP 200)'
-        : (restoreStatus > 0 ? `복구 경로 응답 확인 (HTTP ${restoreStatus})` : '비공개 사본 기반 단건 메모 복구 및 ID·소유자·내용 해시 대조 확인'),
+      attackId: 'unauthenticated_restore',
+      expected: 'HTTP 401; recovery requires verified judge B login',
+      observed: `Actual POST /api/restore/aabbccdd-1234-4567-89ab-123456789abc: HTTP ${restoreResponse.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
     });
   }
 
