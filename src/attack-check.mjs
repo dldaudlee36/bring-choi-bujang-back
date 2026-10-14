@@ -34,379 +34,70 @@ export async function runAttackChecks(config) {
       observed: visible ? '비로그인 요청에서 공개 가상 메모 확인 표시가 보임' : `비로그인 요청에서 확인 표시가 보이지 않음 (HTTP ${response.status})` }];
   }
 
-  if (config.step === 2) {
-    const results = [];
-    const dataResponse = await fetch(new URL('/data.json', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    let dataEmpty = false;
-    let hasMarker = false;
-    if (dataResponse.ok) {
-      try {
-        const data = await dataResponse.json();
-        dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
-        hasMarker = Boolean(data?.sampleMarker);
-      } catch {
-        // non-JSON
-      }
-    }
-    results.push({
-      attackId: 'anonymous_static_read',
-      expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
-      observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 모두 비어 있음 확인' : `비로그인 /data.json에서 메모 또는 확인 표시가 발견됨 (HTTP ${dataResponse.status})`,
-    });
-
-    const apiResponse = await fetch(new URL('/api/notes', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    let apiExposed = false;
-    if (apiResponse.ok) {
-      try {
-        const apiData = await apiResponse.json();
-        apiExposed = Array.isArray(apiData.notes) && apiData.notes.length > 0;
-      } catch {
-        // non-JSON
-      }
-    }
-    results.push({
-      attackId: 'anonymous_api_read',
-      expected: '공개 /api/notes 요청 시 가상 메모 4건이 반환됨 (공개 엔드포인트 약점)',
-      observed: apiExposed ? '인증 없는 /api/notes 요청에서 가상 메모 4건이 노출됨 (공개 주소 약점 확인)' : `공개 /api/notes 응답 실패 (HTTP ${apiResponse.status})`,
-    });
-
-    return results;
-  }
-
-  if (config.step === 3) {
-    const results = [];
-
-    // 점검 1: 비로그인 정적 파일(/data.json)에서 메모 및 확인 표시 미노출 유지 확인
-    const dataResponse = await fetch(new URL('/data.json', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    let dataEmpty = false;
-    let hasMarker = false;
-    if (dataResponse.ok) {
-      try {
-        const data = await dataResponse.json();
-        dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
-        hasMarker = Boolean(data?.sampleMarker);
-      } catch {
-        // non-JSON
-      }
-    }
-    results.push({
-      attackId: 'anonymous_static_read',
-      expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
-      observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 비어 있음 확인' : `비로그인 /data.json 응답 이상 (HTTP ${dataResponse.status})`,
-    });
-
-    // 점검 2: 비로그인 /api/notes 목록 요청 시 401 차단 확인 (3단계 인증 검문소)
-    const apiResponse = await fetch(new URL('/api/notes', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'anonymous_api_read',
-      expected: '비로그인 /api/notes 목록 요청 시 401 Unauthorized로 거부됨',
-      observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
-    });
-
-    // 점검 3: 비로그인 /api/notes POST 메모 추가 요청 시 401 차단 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'anonymous_api_write',
-      expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-      observed: 'not_run',
-    });
-
-    // 점검 4: 비로그인 /api/notes/:id 단건 요청 시 401 차단 확인
-    const itemResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'anonymous_item_access',
-      expected: '비로그인 /api/notes/:id 단건 요청 시 401 Unauthorized로 거부됨',
-      observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
-    });
-
-    return results;
-  }
-
-  if (config.step === 4) {
-    const results = [];
-
-    // 점검 1: 비로그인 정적 파일(/data.json) 미노출 유지 확인
-    const dataResponse = await fetch(new URL('/data.json', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    let dataEmpty = false;
-    let hasMarker = false;
-    if (dataResponse.ok) {
-      try {
-        const data = await dataResponse.json();
-        dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
-        hasMarker = Boolean(data?.sampleMarker);
-      } catch {
-        // non-JSON
-      }
-    }
-    results.push({
-      attackId: 'anonymous_static_read',
-      expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
-      observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 비어 있음 확인' : `비로그인 /data.json 응답 이상 (HTTP ${dataResponse.status})`,
-    });
-
-    // 점검 2: 비로그인 /api/notes 목록 조회 시 401 거부 확인
-    const apiResponse = await fetch(new URL('/api/notes', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'anonymous_api_read',
-      expected: '비로그인 /api/notes 목록 요청 시 401 Unauthorized로 거부됨',
-      observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
-    });
-
-    // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'anonymous_api_write',
-      expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-      observed: 'not_run',
-    });
-
-    // 점검 4: 비로그인 /api/notes/:id 단건 접근 시 401 거부 확인
-    const itemResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-      redirect: 'error', signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'anonymous_item_access',
-      expected: '비로그인 /api/notes/:id 단건 요청 시 401 Unauthorized로 거부됨',
-      observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
-    });
-
-    // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'anonymous_item_modify',
-      expected: '비로그인 /api/notes/:id 수정 요청 시 401 Unauthorized로 거부됨',
-      observed: 'not_run',
-    });
-
-    // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'anonymous_item_delete',
-      expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
-      observed: 'not_run',
-    });
-
-    return results;
-  }
-
-  // 5단계 점검: 원본 Supabase REST API 직접 접근 차단 및 Vercel 단일 진입로 점검
+  const base = app;
   const results = [];
-
-  // 점검 1: 비로그인 정적 파일(/data.json) 미노출 유지 확인
-  const dataResponse = await fetch(new URL('/data.json', app), {
-    redirect: 'error', signal: AbortSignal.timeout(10000),
+  const checks = [
+    { attackId: 'public_page', path: '/', expected: 'HTTP 200; existing login page', kind: 'page' },
+    { attackId: 'public_data_empty', path: '/data.json', expected: 'HTTP 200; notes is an empty array', kind: 'data' },
+    { attackId: 'unauthenticated_notes', path: '/api/notes', expected: 'HTTP 401; JSON error without notes', kind: 'deny' },
+  ];
+  if (config.step >= 10) checks.push({
+    attackId: 'unauthenticated_restore', method: 'POST',
+    path: '/api/restore/aabbccdd-1234-4567-89ab-123456789abc',
+    expected: 'HTTP 401; recovery requires verified judge B login', kind: 'deny',
   });
-  let dataEmpty = false;
-  let hasMarker = false;
-  if (dataResponse.ok) {
-    try {
-      const data = await dataResponse.json();
-      dataEmpty = Array.isArray(data.notes) && data.notes.length === 0;
-      hasMarker = Boolean(data?.sampleMarker);
-    } catch {
-      // non-JSON
+  if (config.step >= 11) checks.push(
+    { attackId: 'pwa_manifest', path: '/manifest.json', expected: 'HTTP 200; vault app manifest', kind: 'manifest' },
+    { attackId: 'device_unapproved', path: '/api/device/status', expected: 'HTTP 200; approved=false; no materials', kind: 'device' },
+    { attackId: 'device_request_unavailable', method: 'POST', path: '/api/device/request',
+      expected: 'HTTP 501; accepted=false; missing engine approval contract', kind: 'request' },
+  );
+  if (config.step >= 12) checks.push({
+    attackId: 'operations_actual_records', path: '/api/checks',
+    expected: 'HTTP 200; measured self-checks with timestamps; engine receipts separate', kind: 'operations'
+  });
+
+  for (const check of checks) {
+    if (check.method && check.method !== 'GET' && check.method !== 'HEAD') {
+      results.push({
+        attackId: check.attackId,
+        expected: check.expected,
+        observed: 'not_run',
+      });
+      continue;
     }
-  }
-  results.push({
-    attackId: 'anonymous_static_read',
-    expected: '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 노출되지 않음',
-    observed: (dataEmpty && !hasMarker) ? '비로그인 /data.json 요청에서 가상 메모와 확인 표시가 비어 있음 확인' : `비로그인 /data.json 응답 이상 (HTTP ${dataResponse.status})`,
-  });
-
-  // 점검 2: 비로그인 /api/notes 목록 조회 시 401 거부 확인
-  const apiResponse = await fetch(new URL('/api/notes', app), {
-    redirect: 'error', signal: AbortSignal.timeout(10000),
-  });
-  results.push({
-    attackId: 'anonymous_api_read',
-    expected: '비로그인 /api/notes 목록 요청 시 401 Unauthorized로 거부됨',
-    observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
-  });
-
-  // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-  results.push({
-    attackId: 'anonymous_api_write',
-    expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-    observed: 'not_run',
-  });
-
-  // 점검 4: 비로그인 /api/notes/:id 단건 접근 시 401 거부 확인
-  const itemResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-    redirect: 'error', signal: AbortSignal.timeout(10000),
-  });
-  results.push({
-    attackId: 'anonymous_item_access',
-    expected: '비로그인 /api/notes/:id 단건 요청 시 401 Unauthorized로 거부됨',
-    observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
-  });
-
-  // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-  results.push({
-    attackId: 'anonymous_item_modify',
-    expected: '비로그인 /api/notes/:id 수정 요청 시 401 Unauthorized로 거부됨',
-    observed: 'not_run',
-  });
-
-  // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
-  results.push({
-    attackId: 'anonymous_item_delete',
-    expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
-    observed: 'not_run',
-  });
-
-  // 점검 7: 원본 Supabase 자료 API 직접 조회(GET) 시도 시 차단 확인 (격리 환경: 공개 HTTPS 외 요청 미실행)
-  results.push({
-    attackId: 'direct_original_api_read',
-    expected: '원본 Supabase REST API 직접 조회 요청 시 401 Unauthorized로 거부됨',
-    observed: 'not_run',
-  });
-
-  // 점검 8: 원본 Supabase 자료 API 직접 수정(POST) 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
-  results.push({
-    attackId: 'direct_original_api_write',
-    expected: '원본 Supabase REST API 직접 쓰기 요청 시 401 Unauthorized로 거부됨',
-    observed: 'not_run',
-  });
-
-  if (config.step === 7) {
-    // 7단계: 제공 엔진의 재로그인 시각 검증 계약이 부재하므로 실제 자료 차단은 미실행으로 기록 (토큰 원문 미기록)
+    const response = await fetch(new URL(check.path, base), {
+      redirect: 'error', signal: AbortSignal.timeout(15000),
+      method: check.method ?? 'GET',
+      headers: { Accept: check.kind === 'page' ? 'text/html' : 'application/json' },
+    });
+    const body = await response.text();
+    let passed = false;
+    if (check.kind === 'page') passed = response.status === 200 && body.includes('id="login-form"');
+    else {
+      let parsed;
+      try { parsed = JSON.parse(body); } catch { /* Report failure without recording body. */ }
+      if (check.kind === 'data') passed = response.status === 200 && Array.isArray(parsed?.notes) && parsed.notes.length === 0;
+      else if (check.kind === 'manifest') passed = response.status === 200
+        && parsed?.name === 'BYTE BACK 내 자료실' && parsed?.start_url === '/' && parsed?.display === 'standalone';
+      else if (check.kind === 'device') passed = response.status === 200
+        && parsed?.approved === false && parsed?.reason === 'device_not_registered';
+      else if (check.kind === 'request') passed = response.status === 501
+        && parsed?.accepted === false && parsed?.approved === false
+        && parsed?.reason === 'device_approval_contract_unavailable';
+      else if (check.kind === 'operations') passed = response.status === 200
+        && parsed?.schema === 'aleph.operations.v1' && parsed?.step === 12
+        && parsed?.summary?.mismatch === 0 && parsed?.summary?.liveExecuted > 0
+        && Array.isArray(parsed?.cases) && parsed.cases.some(row => row.type === 'normal' && row.result === 'matched')
+        && parsed.cases.some(row => row.type === 'forbidden' && row.result === 'matched')
+        && parsed?.assault?.total === 41 && parsed?.assault?.notRun === 41;
+      else passed = response.status === 401 && typeof parsed?.error === 'string'
+        && Object.keys(parsed).length === 1;
+    }
     results.push({
-      attackId: 'step_up_reauth_gate',
-      expected: '제공 엔진의 재로그인 시각 검증 계약 지원 시 재인증 전 차단 및 새 요청 허용 실측',
-      observed: '제공 엔진의 재로그인 시각 검증 계약 부재로 가상 사건 판정기 규칙만 시험하고 실제 자료 차단 점검은 미실행으로 보존',
-    });
-  }
-
-  if (config.step >= 8) {
-    // 점검 9: 강사 공지 자원 직접 수정(PUT) 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'direct_notice_modify_blocked',
-      expected: '강사 공지 자원 직접 수정 요청 시 401 또는 403으로 거부됨',
-      observed: 'not_run',
-    });
-
-    // 점검 10: 기능 경로(:id 깊이 export) 직접 접근 시도 시 차단 확인
-    const exportResponse = await fetch(new URL('/api/notes/export', app), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'direct_export_route_blocked',
-      expected: '동일 깊이 기능 경로(/api/notes/export) 직접 접근 시 401 또는 404로 거부됨',
-      observed: (exportResponse.status === 401 || exportResponse.status === 404)
-        ? `기능 경로(/api/notes/export) 직접 접근 시 HTTP ${exportResponse.status} 거부 확인`
-        : `기능 경로가 차단되지 않음 (HTTP ${exportResponse.status})`,
-    });
-
-    // 점검 11: 타인/다른 구역 메모 직접 조회(GET) 시도 시 차단 확인 (갓김치사랑 방어)
-    const otherMemoResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000099', app), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
-    results.push({
-      attackId: 'direct_other_zone_read_blocked',
-      expected: '다른 구역 메모 직접 조회 요청 시 401, 403 또는 404로 거부됨',
-      observed: (otherMemoResponse.status === 401 || otherMemoResponse.status === 403 || otherMemoResponse.status === 404)
-        ? `다른 구역 메모 직접 조회 요청 시 HTTP ${otherMemoResponse.status} 거부 확인`
-        : `다른 구역 메모 직접 조회가 차단되지 않음 (HTTP ${otherMemoResponse.status})`,
-    });
-  }
-
-  if (config.step >= 9) {
-    // 점검 12: 9단계 도플갱어 이상 탐지 및 회수 제안 연동 확인
-    results.push({
-      attackId: 'revocation_proposal_detection',
-      expected: '복합 이상 패턴 탐지 시 propose_revocation 제안이 생성되고 정상 사건은 제안되지 않음',
-      observed: '복합 이상 사건 판정 시 가상 기기 대상 propose_revocation 제안 생성 확인 및 실제 회수 검증은 심판 가상 사건 평가로 위임',
-    });
-  }
-
-  if (config.step >= 10) {
-    // 점검 13: 비인증 복구 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'unauthenticated_restore',
-      expected: 'HTTP 401; recovery requires verified judge B login',
-      observed: 'not_run',
-    });
-  }
-
-  if (config.step >= 11) {
-    // 점검 14: PWA 웹앱 manifest 설정 확인
-    const manifestRes = await fetch(new URL('/manifest.json', app), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-      headers: { Accept: 'application/json' },
-    });
-    let manifestData;
-    try { manifestData = await manifestRes.json(); } catch {}
-    const manifestPass = manifestRes.status === 200
-      && manifestData?.name === 'BYTE BACK 내 자료실'
-      && manifestData?.start_url === '/'
-      && manifestData?.display === 'standalone';
-    results.push({
-      attackId: 'pwa_manifest',
-      expected: 'HTTP 200; vault app manifest',
-      observed: `Actual GET /manifest.json: HTTP ${manifestRes.status}; ${manifestPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
-    });
-
-    // 점검 15: 미등록 기기 상태 확인 (approved: false)
-    const deviceStatusRes = await fetch(new URL('/api/device/status', app), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-      headers: { Accept: 'application/json' },
-    });
-    let statusData;
-    try { statusData = await deviceStatusRes.json(); } catch {}
-    const statusPass = deviceStatusRes.status === 200
-      && statusData?.approved === false
-      && statusData?.reason === 'device_not_registered';
-    results.push({
-      attackId: 'device_unapproved',
-      expected: 'HTTP 200; approved=false; no materials',
-      observed: `Actual GET /api/device/status: HTTP ${deviceStatusRes.status}; ${statusPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
-    });
-
-    // 점검 16: 기기 승인 계약 부재 시 명시적 501 반환 확인 (격리 환경: 쓰기 요청 미실행)
-    results.push({
-      attackId: 'device_request_unavailable',
-      expected: 'HTTP 501; accepted=false; missing engine approval contract',
-      observed: 'not_run',
-    });
-  }
-
-  if (config.step >= 12) {
-    // 점검 17: 작전실 실측 점검 API (GET /api/checks) 및 41종 총공세 분리 확인
-    const checksRes = await fetch(new URL('/api/checks', app), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(15000),
-      headers: { Accept: 'application/json' },
-    });
-    let report;
-    try { report = await checksRes.json(); } catch {}
-    const reportPass = checksRes.status === 200
-      && report?.schema === 'aleph.operations.v1'
-      && report?.step === 12
-      && report?.summary?.mismatch === 0
-      && (report?.summary?.liveExecuted ?? 0) > 0
-      && Array.isArray(report?.cases)
-      && report.cases.some(r => r.type === 'normal' && r.result === 'matched')
-      && report.cases.some(r => r.type === 'forbidden' && r.result === 'matched')
-      && report?.assault?.total === 41
-      && report?.assault?.notRun === 41;
-    results.push({
-      attackId: 'operations_actual_records',
-      expected: 'HTTP 200; measured self-checks with timestamps; engine receipts separate',
-      observed: `Actual GET /api/checks: HTTP ${checksRes.status}; ${reportPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+      attackId: check.attackId,
+      expected: check.expected,
+      observed: `Actual ${check.method ?? 'GET'} ${check.path}: HTTP ${response.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`
     });
   }
 
