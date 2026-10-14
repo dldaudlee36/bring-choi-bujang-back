@@ -3,7 +3,7 @@
 -- 다른 메모는 절대 복사하지 않는다. 출처는 'baseline_verified'로 구분해 기록한다.
 insert into public.note_restore_backups(note_id, owner_id, title, content, created_at, content_sha256, policy_sha256, provenance)
 select n.id, n.owner_id, n.title, coalesce(n.content, n.body, ''), coalesce(n.created_at, now()),
-  encode(extensions.digest(convert_to(jsonb_build_object('title', n.title, 'content', coalesce(n.content, n.body, ''))::text, 'UTF8'), 'sha256'), 'hex'),
+  encode(extensions.digest(convert_to(octet_length(convert_to(n.title, 'UTF8'))::text || ':' || n.title || coalesce(n.content, n.body, ''), 'UTF8'), 'sha256'), 'hex'),
   '7930b6fd6053ffc4fbb54696025b826224f7c6002b350360b95d9611c9d19f93',
   'baseline_verified'
 from public.notes n

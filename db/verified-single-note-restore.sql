@@ -1,3 +1,4 @@
+-- 내용 지문(SHA-256) 방식: sha256(UTF-8 '제목바이트수:' || 제목 || 본문). 서버 코드(src/restore-api.mjs의 noteHash)와 같은 방식이다.
 create schema if not exists vault_private;
 revoke all on schema vault_private from public, anon, authenticated;
 
@@ -43,7 +44,7 @@ begin
  if new.owner_id is not null then
   insert into public.note_restore_backups(note_id, owner_id, title, content, created_at, content_sha256, policy_sha256)
   values(new.id, new.owner_id, new.title, coalesce(new.content, new.body, ''), coalesce(new.created_at, now()),
-    encode(extensions.digest(convert_to(jsonb_build_object('title', new.title, 'content', coalesce(new.content, new.body, ''))::text, 'UTF8'), 'sha256'), 'hex'),
+    encode(extensions.digest(convert_to(octet_length(convert_to(new.title, 'UTF8'))::text || ':' || new.title || coalesce(new.content, new.body, ''), 'UTF8'), 'sha256'), 'hex'),
     '7930b6fd6053ffc4fbb54696025b826224f7c6002b350360b95d9611c9d19f93')
   on conflict(note_id) do nothing;
  end if;
@@ -67,7 +68,7 @@ begin
  select * into b from public.note_restore_backups where note_id = p_note_id;
  if not found then return jsonb_build_object('error', 'verified_backup_missing'); end if;
  if b.owner_id <> p_owner_id then return jsonb_build_object('error', 'not_found_or_not_owned'); end if;
- actual_hash := encode(extensions.digest(convert_to(jsonb_build_object('title', b.title, 'content', b.content)::text, 'UTF8'), 'sha256'), 'hex');
+ actual_hash := encode(extensions.digest(convert_to(octet_length(convert_to(b.title, 'UTF8'))::text || ':' || b.title || b.content, 'UTF8'), 'sha256'), 'hex');
  if b.provenance not in ('original_insert','baseline_verified') or actual_hash <> b.content_sha256
     or b.policy_sha256 <> p_policy_sha256 then
   return jsonb_build_object('error', 'backup_verification_failed');
@@ -89,7 +90,7 @@ begin
  if not exists(
    select 1 from public.notes n
    where n.id = b.note_id and n.owner_id = b.owner_id
-     and encode(extensions.digest(convert_to(jsonb_build_object('title', n.title, 'content', coalesce(n.content, n.body, ''))::text, 'UTF8'), 'sha256'), 'hex') = b.content_sha256
+     and encode(extensions.digest(convert_to(octet_length(convert_to(n.title, 'UTF8'))::text || ':' || n.title || coalesce(n.content, n.body, ''), 'UTF8'), 'sha256'), 'hex') = b.content_sha256
  ) then
    raise exception 'restore_verification_failed';
  end if;

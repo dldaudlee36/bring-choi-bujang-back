@@ -32,11 +32,11 @@
   - 자료 API(`api/notes.js`)에서도 화면 메뉴나 요청 본문·쿼리의 `role`을 신뢰하지 않고, 암호학적으로 검증된 토큰 사용자와 저장된 소유자·강사 권한을 재대조하여 짧은 사유(`NOT_OWNER`, `INSUFFICIENT_ROLE`)로 차단합니다.
 * **9단계: 도플갱어 탐지 및 권한 회수 제안 (`propose_revocation`)**:
   - 낯선 네트워크(`network === 'unusual'`)와 갑작스러운 다량 조회(`hasHighActivity`)가 동시에 나타날 때만 복합 의심 사건으로 판정하여 회수 제안(`propose_revocation`)을 반환합니다.
-* **10단계: 검증된 사본 기반 단건 메모 복구 (`POST /api/restore/:noteId`, `src/trial-policy-restore.mjs`)**:
-  - **복구 엔드포인트**: `POST /api/restore/:noteId`
+* **10단계: 검증된 사본 기반 단건 메모 복구 (`POST /api/notes/:id/restore`, `src/trial-policy-restore.mjs`)**:
+  - **복구 엔드포인트**: `POST /api/notes/:id/restore`(`restoreRoute`). 같은 처리기가 기존 경로 `POST /api/restore/:noteId`도 받습니다.
   - `src/trial-policy-restore.mjs`: `previewPolicyRestore`를 통해 사본 버전과 변경 범위(`service: notes`)를 사전 확인하고, `confirmationHash` 대조 시에만 `applyTrialPolicyRestore`로 가상 정책을 복원하며 다른 서비스 규칙과 감사 이력은 온전히 보존합니다.
-  - `src/restore-api.mjs` & `api/restore/[noteId].js`: 심판 B 인증을 필수 검증하며 요청 본문의 임의 입력을 전면 차단(`restore_body_not_allowed`)하고, 서버의 비공개 검증 사본에서 지정된 1건의 메모만 복원합니다.
-  - Supabase `restore_verified_note`: 사본 지문 대조, 복원 후 테이블 재검증(SELECT), 감사 로그(`note_restore_audit`) 자동 적재를 일관되게 수행합니다.
+  - `src/restore-api.mjs`: 심판 B 인증을 요구합니다. 요청 본문과 경로 밖의 쿼리는 읽지 않고 무시하며, 경로의 ID 한 건만 복원합니다. 처리 순서는 (1) 본인 소유 사본을 직접 읽기, (2) 사본의 내용 지문(`sha256('제목바이트수:제목본문')`)과 정책 지문을 다시 계산해 대조, (3) 현재 메모의 소유자 확인, (4) 복원, (5) 복원한 메모를 다시 읽어 ID·소유자·내용 지문을 사본과 대조입니다. 사본이 없으면 404, 사본 검증이 어긋나면 409(`backup_unverified`), 복원 결과가 어긋나면 409(`restore_mismatch`)입니다.
+  - Supabase `restore_verified_note`: 같은 검증을 DB 안에서 한 번 더 수행하고, 잠금 안에서 복원과 감사 로그(`note_restore_audit`) 적재를 처리합니다. 메모를 만들 때는 DB 트리거가 사본을 자동으로 남기고, 이미 있던 메모는 `db/baseline-seed-existing-notes.sql`로 사본을 채웁니다.
 
 ---
 
