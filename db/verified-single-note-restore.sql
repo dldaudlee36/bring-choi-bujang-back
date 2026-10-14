@@ -2,18 +2,11 @@
 create schema if not exists vault_private;
 revoke all on schema vault_private from public, anon, authenticated;
 
--- 테이블 컬럼 호환성 보장 (body 및 content 모두 지원)
-do $$
-begin
-  if not exists (select 1 from information_schema.columns where table_name = 'notes' and column_name = 'body' and table_schema = 'public') then
-    alter table public.notes add column body text;
-    update public.notes set body = content where content is not null;
-  end if;
-  if not exists (select 1 from information_schema.columns where table_name = 'notes' and column_name = 'content' and table_schema = 'public') then
-    alter table public.notes add column content text;
-    update public.notes set content = body where body is not null;
-  end if;
-end $$;
+-- 테이블 컬럼 호환성 보장 (body 및 content 모두 지원, PL/pgSQL 블록 밖에서 순차 실행)
+alter table public.notes add column if not exists body text;
+alter table public.notes add column if not exists content text;
+update public.notes set content = body where content is null and body is not null;
+update public.notes set body = content where body is null and content is not null;
 
 -- 1. 비공개 안전 사본 표 (service_role만 조회 및 추가 가능)
 create table if not exists public.note_restore_backups (
@@ -73,7 +66,7 @@ drop trigger if exists capture_note_original on public.notes;
 create trigger capture_note_original after insert on public.notes
 for each row execute function vault_private.capture_note_original();
 
--- 4. 기존 메모 백필(backfill) - 이미 생성된 메모들을 안전 사본으로 등록
+-- 4. 기존 메모 백필(backfill) - 침해 전 원본 등록
 insert into public.note_restore_backups(note_id, owner_id, title, content, created_at, content_sha256, policy_sha256)
 select
   n.id,

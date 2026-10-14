@@ -36,5 +36,8 @@ export function deploymentIdentity(env, config) {
   if (typeof config.originalApiUrl === 'string' && config.originalApiUrl.startsWith('https://')) {
     identity.originalApiUrl = config.originalApiUrl;
   }
+  if (typeof config.restoreRoute === 'string' && config.restoreRoute) {
+    identity.restoreRoute = config.restoreRoute;
+  }
   return identity;
 }
