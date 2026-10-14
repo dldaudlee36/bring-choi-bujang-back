@@ -1,11 +1,12 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { trace, tokenHint } from './request-trace.mjs';
+import { trace, tokenHint, entryHint } from './request-trace.mjs';
 
 export function createRestoreHandler({ db, verifyLogin, policyDigest = async () =>
   createHash('sha256').update((await readFile(new URL('./decider.mjs', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')).digest('hex') }) {
   return async (request, response) => {
     response.setHeader('Cache-Control', 'no-store');
+    await trace(db, { route: '/api/restore', method: request.method, kind: 'entry', reason: entryHint(request) });
     let who = null;
     let seenId = null;
     const deny = async (status, reason) => {

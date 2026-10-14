@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import config from '../../aleph.config.json' with { type: 'json' };
-import { trace, tokenHint } from '../../src/request-trace.mjs';
+import { trace, tokenHint, entryHint } from '../../src/request-trace.mjs';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
 import { resourceId } from '../../src/resource-id.mjs';
 import { noteTarget } from '../../src/note-target.mjs';
@@ -41,6 +41,7 @@ function noteResponse(note) {
 }
 
 export default async function handler(request, response) {
+  await trace(supabase, { route: request.url?.split('?')[0], method: request.method, kind: 'entry', reason: entryHint(request) });
   if (!['GET', 'PUT', 'DELETE'].includes(request.method)) {
     response.setHeader('Allow', 'GET, PUT, DELETE');
     return response.status(405).json({ error: 'Method not allowed' });

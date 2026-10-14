@@ -28,3 +28,9 @@ export function tokenHint(authorization) {
     return `iss=${String(c.iss).slice(0, 70)} aud=${JSON.stringify(c.aud)?.slice(0, 80)} alg=${h.alg} role=${c.aleph_role ?? '-'} id=${c.aleph_identity ?? '-'} exp_in=${(c.exp ?? 0) - now}s`;
   } catch { return 'undecodable_token'; }
 }
+
+// 모든 요청의 진입 기록. 토큰과 본문은 제외하고 메서드, 경로, 인증 헤더 유무, 호스트, 클라이언트 종류만 남긴다.
+export function entryHint(request) {
+  const h = request.headers ?? {};
+  return `url=${String(request.url ?? '').slice(0, 110)} auth=${Boolean(h.authorization)} host=${String(h.host ?? '').slice(0, 60)} ua=${String(h['user-agent'] ?? '').slice(0, 40)}`;
+}
