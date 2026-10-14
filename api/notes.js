@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with { type: 'json' };
-import { trace } from '../src/request-trace.mjs';
+import { trace, tokenHint } from '../src/request-trace.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -53,6 +53,7 @@ export default async function handler(request, response) {
 
   const login = await verifyLogin(request.headers.authorization);
   if (!login) {
+    if (request.headers.authorization) await trace(supabase, { route: request.url?.split('?')[0], method: request.method, kind: 'rejected', status: 401, reason: tokenHint(request.headers.authorization) });
     return response.status(401).json({ error: '로그인이 필요합니다.' });
   }
   if (login.kind === 'judge') await trace(supabase, { route: '/api/notes', method: request.method, kind: login.kind, identity: login.identity, userId: login.userId, reason: 'seen' });

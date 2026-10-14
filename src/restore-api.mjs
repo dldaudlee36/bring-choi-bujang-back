@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
-import { trace } from './request-trace.mjs';
+import { trace, tokenHint } from './request-trace.mjs';
 
 export function createRestoreHandler({ db, verifyLogin, policyDigest = async () =>
   createHash('sha256').update((await readFile(new URL('./decider.mjs', import.meta.url), 'utf8')).replace(/\r\n/g, '\n')).digest('hex') }) {
@@ -16,7 +16,10 @@ export function createRestoreHandler({ db, verifyLogin, policyDigest = async () 
     if (request.method !== 'POST') { response.setHeader('Allow', 'POST'); return deny(405, 'method_not_allowed'); }
     if (!db || !verifyLogin) return deny(503, 'server_configuration_unavailable');
     const login = await verifyLogin(request.headers.authorization);
-    if (!login) return deny(401, 'login_required');
+    if (!login) {
+      await trace(db, { route: '/api/restore', method: request.method, kind: 'rejected', status: 401, reason: tokenHint(request.headers.authorization) });
+      return deny(401, 'login_required');
+    }
     who = { kind: login.kind, identity: login.identity ?? null, userId: login.userId };
     // No student can use the judge-only recovery exercise against production notes.
     if (login.kind !== 'judge' || login.identity !== 'b') return deny(403, 'test_account_b_required');
