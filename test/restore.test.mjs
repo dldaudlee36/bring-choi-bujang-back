@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { policyHash, previewPolicyRestore, applyTrialPolicyRestore, trialAllows } from '../src/trial-policy-restore.mjs';
 import { createRestoreHandler, noteHash } from '../src/restore-api.mjs';
+import config from '../aleph.config.json' with { type: 'json' };
+import { deploymentIdentity } from '../scripts/deployment-identity.mjs';
 
 test('verified trial backup previews version and scope, then restores A access while preserving other rules and audit', () => {
   const snapshot = {
@@ -94,6 +96,21 @@ test('a deleted note is recreated from the copy', async () => {
   const result = await invoke({ current: null });
   assert.equal(result.res.code, 200);
   assert.equal(result.res.body.state, 'recreated');
+});
+
+test('published restoreRoute expands to the working POST handler and preserves ownership checks', async () => {
+  const deployment = deploymentIdentity({
+    VERCEL_GIT_PROVIDER: 'github', VERCEL_GIT_REPO_OWNER: 'dldaudlee36',
+    VERCEL_GIT_REPO_SLUG: 'bring-choi-bujang-back', VERCEL_GIT_COMMIT_SHA: 'a'.repeat(40),
+    VERCEL_URL: 'rescue-choi-bujang-pc.vercel.app',
+  }, config);
+  assert.equal(deployment.restoreRoute, '/api/restore/:noteId');
+  assert.ok(config.allowedRoutes.includes('POST ' + deployment.restoreRoute));
+  const url = deployment.restoreRoute.replace(':noteId', id);
+  assert.equal((await invoke({ url })).res.code, 200);
+  assert.equal((await invoke({ url, current: null })).res.code, 200);
+  assert.equal((await invoke({ url, login: null })).res.code, 401);
+  assert.equal((await invoke({ url, login: { kind: 'judge', identity: 'a', userId: 'synthetic_a' } })).res.code, 403);
 });
 
 test('only judge B is accepted, and client owner/content/body/query values are never used', async () => {
