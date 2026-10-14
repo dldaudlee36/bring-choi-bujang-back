@@ -409,7 +409,7 @@ export async function runAttackChecks(config) {
   }
 
   if (config.step >= 10) {
-    const restoreResponse = await fetch(new URL('/api/restore/aabbccdd-1234-4567-89ab-123456789abc', app), {
+    const restoreResponse = await fetch(new URL('/api/notes/aabbccdd-1234-4567-89ab-123456789abc/restore', app), {
       method: 'POST',
       redirect: 'error',
       signal: AbortSignal.timeout(10000),
@@ -423,7 +423,7 @@ export async function runAttackChecks(config) {
     results.push({
       attackId: 'unauthenticated_restore',
       expected: 'HTTP 401; recovery requires verified judge B login',
-      observed: `Actual POST /api/restore/aabbccdd-1234-4567-89ab-123456789abc: HTTP ${restoreResponse.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+      observed: `Actual POST /api/notes/aabbccdd-1234-4567-89ab-123456789abc/restore: HTTP ${restoreResponse.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
     });
   }
 

@@ -26,7 +26,8 @@ export function createRestoreHandler({ db, verifyLogin, policyDigest = async () 
     if (login.kind !== 'judge' || login.identity !== 'b') return deny(403, 'test_account_b_required');
     let url;
     try { url = new URL(request.url, 'https://api.invalid'); } catch { return deny(400, 'invalid_restore_path'); }
-    const match = /^\/api\/restore\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu.exec(url.pathname);
+    const match = new RegExp('^/api/restore/' + '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})' + '$', 'iu').exec(url.pathname)
+      ?? new RegExp('^/api/notes/' + '([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})' + '/restore$', 'iu').exec(url.pathname);
     // 경로의 ID만 신뢰한다. 쿼리의 noteId가 경로와 다르면 거부하고, 그 밖의 쿼리와 요청 본문은 읽지 않고 무시한다.
     if (!match || url.searchParams.getAll('noteId').length > 1
       || url.searchParams.getAll('noteId').some(id => id.toLowerCase() !== match[1].toLowerCase()))

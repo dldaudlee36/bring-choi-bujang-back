@@ -11,6 +11,7 @@
   },
   "allowedRoutes": [
     "POST /api/restore/:noteId",
+    "POST /api/notes/:id/restore",
     "GET /api/notes",
     "POST /api/notes",
     "GET /api/notes/:id",
@@ -19,5 +20,5 @@
     "POST /api/login"
   ],
   "originalApiUrl": "https://mxiycelcxviyvsixuytr.supabase.co/rest/v1/notes",
-  "restoreRoute": "/api/restore/:noteId"
+  "restoreRoute": "POST /api/notes/:id/restore"
 }

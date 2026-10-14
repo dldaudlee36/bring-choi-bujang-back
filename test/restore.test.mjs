@@ -84,6 +84,15 @@ test('restore ignores any request body and extra query values; only the path ID 
   assert.equal(result.calls[0][1].p_note_id, id);
 });
 
+test('restoreRoute POST /api/notes/:id/restore resolves to the same single-note restore', async () => {
+  const result = await invoke({ url: '/api/notes/' + id + '/restore?id=' + id });
+  assert.equal(result.res.code, 200);
+  assert.equal(result.calls[0][1].p_note_id, id);
+  const plain = await invoke({ url: '/api/notes/' + id });
+  assert.equal(plain.res.code, 400);
+  assert.equal(plain.calls.length, 0);
+});
+
 test('seed-style IDs (non RFC4122 version/variant) are accepted as the same single note', async () => {
   const seed = 'a0000000-0000-0000-0000-000000000004';
   const result = await invoke({ url: '/api/restore/' + seed, data: { restored: true, noteId: seed, contentSha256: 'a'.repeat(64) } });
