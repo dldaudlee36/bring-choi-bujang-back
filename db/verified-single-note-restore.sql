@@ -7,7 +7,10 @@ alter table public.notes add column if not exists content text;
 update public.notes set content = body where content is null and body is not null;
 update public.notes set body = content where body is null and content is not null;
 
-create table if not exists public.note_restore_backups (
+drop table if exists public.note_restore_backups cascade;
+drop table if exists public.note_restore_audit cascade;
+
+create table public.note_restore_backups (
  note_id uuid primary key,
  owner_id uuid not null,
  title text not null,
@@ -20,9 +23,9 @@ create table if not exists public.note_restore_backups (
 );
 alter table public.note_restore_backups enable row level security;
 revoke all on public.note_restore_backups from public, anon, authenticated, service_role;
-grant select, insert on public.note_restore_backups to service_role;
+grant select on public.note_restore_backups to service_role;
 
-create table if not exists public.note_restore_audit (
+create table public.note_restore_audit (
  id bigint generated always as identity primary key,
  note_id uuid not null,
  owner_id uuid not null,
@@ -55,6 +58,20 @@ revoke all on function vault_private.capture_note_original() from public, anon, 
 drop trigger if exists capture_note_original on public.notes;
 create trigger capture_note_original after insert on public.notes
 for each row execute function vault_private.capture_note_original();
+
+insert into public.note_restore_backups(note_id, owner_id, title, content, created_at, content_sha256, policy_sha256)
+select
+  n.id,
+  n.owner_id,
+  n.title,
+  coalesce(n.content, n.body, ''),
+  coalesce(n.created_at, now()),
+  encode(extensions.digest(convert_to(jsonb_build_object('title', n.title, 'content', coalesce(n.content, n.body, ''))::text, 'UTF8'), 'sha256'), 'hex'),
+  '7930b6fd6053ffc4fbb54696025b826224f7c6002b350360b95d9611c9d19f93'
+from public.notes n
+where n.id is not null and n.owner_id is not null
+  and n.title not like '%변조%' and n.title not like '%tamper%' and n.title not like '%닭크웹%'
+on conflict(note_id) do nothing;
 
 create or replace function public.restore_verified_note(p_note_id uuid, p_owner_id uuid, p_policy_sha256 text)
 returns jsonb language plpgsql security invoker set search_path = '' as $$

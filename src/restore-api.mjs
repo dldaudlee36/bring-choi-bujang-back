@@ -17,7 +17,7 @@ export function createRestoreHandler({ db, verifyLogin, policyDigest = async () 
     if (login.kind !== 'judge' || login.identity !== 'b') return deny(403, 'test_account_b_required');
     let url;
     try { url = new URL(request.url, 'https://api.invalid'); } catch { return deny(400, 'invalid_restore_path'); }
-    const match = /^\/api\/restore\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu.exec(url.pathname);
+    const match = /^\/api\/restore\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu.exec(url.pathname);
     if (!match || [...url.searchParams.keys()].some(key => key !== 'noteId')
       || url.searchParams.getAll('noteId').length > 1
       || url.searchParams.getAll('noteId').some(id => id.toLowerCase() !== match[1].toLowerCase()))
@@ -29,14 +29,8 @@ export function createRestoreHandler({ db, verifyLogin, policyDigest = async () 
     const { data, error } = await db.rpc('restore_verified_note', {
       p_note_id: id, p_owner_id: login.userId, p_policy_sha256: digest,
     });
-    if (error) {
-      console.error('[restore-api] Supabase RPC error:', error.message || error);
-      return deny(503, 'restore_failed');
-    }
-    if (data?.error) {
-      console.warn('[restore-api] Supabase restore rejected:', data.error);
-      return deny(data.error === 'not_found_or_not_owned' ? 404 : 409, data.error);
-    }
+    if (error) return deny(503, 'restore_failed');
+    if (data?.error) return deny(data.error === 'not_found_or_not_owned' ? 404 : 409, data.error);
     if (data?.restored !== true || data.noteId !== id || !/^[0-9a-f]{64}$/u.test(data.contentSha256 ?? ''))
       return deny(503, 'restore_verification_failed');
     response.setHeader('X-Aleph-Resource-Id', 'notes:' + id);

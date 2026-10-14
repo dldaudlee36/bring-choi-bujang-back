@@ -2,7 +2,7 @@
   "step": 10,
   "repoUrl": "https://github.com/dldaudlee36/bring-choi-bujang-back",
   "publicAppUrl": "https://rescue-choi-bujang-pc.vercel.app",
-  "sampleMarker": null,
+  "sampleMarker": "SAMPLE_NOTE_1",
   "judgeIssuer": "https://aleph-judge-production.up.railway.app/defense/judge",
   "identityProvider": {
     "issuer": "https://mxiycelcxviyvsixuytr.supabase.co/auth/v1",

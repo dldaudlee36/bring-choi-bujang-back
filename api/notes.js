@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import config from '../aleph.config.json' with { type: 'json' };
 import { createLoginVerifier } from '../src/verify-login.mjs';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
@@ -91,7 +91,7 @@ export default async function handler(request, response) {
   }
 
   const id = payload.id == null || payload.id === '' ? randomUUID() : payload.id;
-  if (typeof id !== 'string' || !UUID_RE.test(id)) {
+  if (typeof id !== 'string' || !UUID.test(id)) {
     return response.status(400).json({ error: 'id는 UUID여야 합니다.' });
   }
 
