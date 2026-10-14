@@ -7,11 +7,9 @@ alter table public.notes add column if not exists content text;
 update public.notes set content = body where content is null and body is not null;
 update public.notes set body = content where body is null and content is not null;
 
--- 이전 오염된 사본 및 감사 테이블 완전 초기화
-drop table if exists public.note_restore_backups cascade;
-drop table if exists public.note_restore_audit cascade;
+-- 주의: 이미 만들어진 검증 사본을 지우지 않는다. 재실행해도 사본과 감사 기록은 보존된다.
 
-create table public.note_restore_backups (
+create table if not exists public.note_restore_backups (
  note_id uuid primary key,
  owner_id uuid not null,
  title text not null,
@@ -26,7 +24,7 @@ alter table public.note_restore_backups enable row level security;
 revoke all on public.note_restore_backups from public, anon, authenticated, service_role;
 grant select on public.note_restore_backups to service_role;
 
-create table public.note_restore_audit (
+create table if not exists public.note_restore_audit (
  id bigint generated always as identity primary key,
  note_id uuid not null,
  owner_id uuid not null,
