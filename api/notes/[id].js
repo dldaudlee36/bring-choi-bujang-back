@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import config from '../../aleph.config.json' with { type: 'json' };
+import { trace } from '../../src/request-trace.mjs';
 import { createLoginVerifier } from '../../src/verify-login.mjs';
 import { resourceId } from '../../src/resource-id.mjs';
 import { noteTarget } from '../../src/note-target.mjs';
@@ -53,6 +54,7 @@ export default async function handler(request, response) {
   if (!login) {
     return response.status(401).json({ error: '로그인이 필요합니다.' });
   }
+  if (login.kind === 'judge') await trace(supabase, { route: '/api/notes/:id', method: request.method, kind: login.kind, identity: login.identity, userId: login.userId, noteId: noteTarget(request), reason: 'seen' });
 
   const rawId = noteTarget(request);
   if (typeof rawId !== 'string' || !UUID.test(rawId)) {
