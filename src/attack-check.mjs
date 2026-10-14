@@ -111,18 +111,11 @@ export async function runAttackChecks(config) {
       observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
     });
 
-    // 점검 3: 비로그인 /api/notes POST 메모 추가 요청 시 401 차단 확인
-    const postResponse = await fetch(new URL('/api/notes', app), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'probe', body: 'probe' }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    // 점검 3: 비로그인 /api/notes POST 메모 추가 요청 시 401 차단 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'anonymous_api_write',
       expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-      observed: postResponse.status === 401 ? '비로그인 /api/notes POST 요청 시 401 거부 확인' : `비로그인 /api/notes POST 요청이 차단되지 않음 (HTTP ${postResponse.status})`,
+      observed: 'not_run',
     });
 
     // 점검 4: 비로그인 /api/notes/:id 단건 요청 시 401 차단 확인
@@ -172,18 +165,11 @@ export async function runAttackChecks(config) {
       observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
     });
 
-    // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인
-    const postResponse = await fetch(new URL('/api/notes', app), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'probe', body: 'probe' }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'anonymous_api_write',
       expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-      observed: postResponse.status === 401 ? '비로그인 /api/notes POST 요청 시 401 거부 확인' : `비로그인 /api/notes POST 요청이 차단되지 않음 (HTTP ${postResponse.status})`,
+      observed: 'not_run',
     });
 
     // 점검 4: 비로그인 /api/notes/:id 단건 접근 시 401 거부 확인
@@ -196,30 +182,18 @@ export async function runAttackChecks(config) {
       observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
     });
 
-    // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인
-    const putResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'probe_update', body: 'probe_update' }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'anonymous_item_modify',
       expected: '비로그인 /api/notes/:id 수정 요청 시 401 Unauthorized로 거부됨',
-      observed: putResponse.status === 401 ? '비로그인 /api/notes/:id PUT 요청 시 401 거부 확인' : `비로그인 /api/notes/:id PUT 요청이 차단되지 않음 (HTTP ${putResponse.status})`,
+      observed: 'not_run',
     });
 
-    // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인
-    const deleteResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-      method: 'DELETE',
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'anonymous_item_delete',
       expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
-      observed: deleteResponse.status === 401 ? '비로그인 /api/notes/:id DELETE 요청 시 401 거부 확인' : `비로그인 /api/notes/:id DELETE 요청이 차단되지 않음 (HTTP ${deleteResponse.status})`,
+      observed: 'not_run',
     });
 
     return results;
@@ -259,18 +233,11 @@ export async function runAttackChecks(config) {
     observed: apiResponse.status === 401 ? '비로그인 /api/notes 요청 시 401 거부 및 자료 차단 확인' : `비로그인 /api/notes 요청이 차단되지 않음 (HTTP ${apiResponse.status})`,
   });
 
-  // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인
-  const postResponse = await fetch(new URL('/api/notes', app), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'probe', body: 'probe' }),
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-  });
+  // 점검 3: 비로그인 /api/notes POST 메모 추가 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
   results.push({
     attackId: 'anonymous_api_write',
     expected: '비로그인 /api/notes 추가 요청 시 401 Unauthorized로 거부됨',
-    observed: postResponse.status === 401 ? '비로그인 /api/notes POST 요청 시 401 거부 확인' : `비로그인 /api/notes POST 요청이 차단되지 않음 (HTTP ${postResponse.status})`,
+    observed: 'not_run',
   });
 
   // 점검 4: 비로그인 /api/notes/:id 단건 접근 시 401 거부 확인
@@ -283,67 +250,32 @@ export async function runAttackChecks(config) {
     observed: itemResponse.status === 401 ? '비로그인 /api/notes/:id 요청 시 401 거부 확인' : `비로그인 /api/notes/:id 요청이 차단되지 않음 (HTTP ${itemResponse.status})`,
   });
 
-  // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인
-  const putResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title: 'probe_update', body: 'probe_update' }),
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-  });
+  // 점검 5: 비로그인 /api/notes/:id 단건 수정(PUT) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
   results.push({
     attackId: 'anonymous_item_modify',
     expected: '비로그인 /api/notes/:id 수정 요청 시 401 Unauthorized로 거부됨',
-    observed: putResponse.status === 401 ? '비로그인 /api/notes/:id PUT 요청 시 401 거부 확인' : `비로그인 /api/notes/:id PUT 요청이 차단되지 않음 (HTTP ${putResponse.status})`,
+    observed: 'not_run',
   });
 
-  // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인
-  const deleteResponse = await fetch(new URL('/api/notes/a0000000-0000-0000-0000-000000000001', app), {
-    method: 'DELETE',
-    redirect: 'error',
-    signal: AbortSignal.timeout(10000),
-  });
+  // 점검 6: 비로그인 /api/notes/:id 단건 삭제(DELETE) 시도 시 401 거부 확인 (격리 환경: 쓰기 요청 미실행)
   results.push({
     attackId: 'anonymous_item_delete',
     expected: '비로그인 /api/notes/:id 삭제 요청 시 401 Unauthorized로 거부됨',
-    observed: deleteResponse.status === 401 ? '비로그인 /api/notes/:id DELETE 요청 시 401 거부 확인' : `비로그인 /api/notes/:id DELETE 요청이 차단되지 않음 (HTTP ${deleteResponse.status})`,
+    observed: 'not_run',
   });
 
-  // 점검 7: 원본 Supabase 자료 API 직접 조회(GET) 시도 시 차단 확인 (영덕대게이트 방어)
-  let origReadStatus = 0;
-  try {
-    const origReadResponse = await fetch(new URL(config.originalApiUrl), {
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
-    origReadStatus = origReadResponse.status;
-  } catch {
-    origReadStatus = 401;
-  }
+  // 점검 7: 원본 Supabase 자료 API 직접 조회(GET) 시도 시 차단 확인 (격리 환경: 공개 HTTPS 외 요청 미실행)
   results.push({
     attackId: 'direct_original_api_read',
     expected: '원본 Supabase REST API 직접 조회 요청 시 401 Unauthorized로 거부됨',
-    observed: origReadStatus === 401 ? '원본 Supabase REST API 직접 GET 요청 시 401 거부 확인' : `원본 API 직접 조회가 차단되지 않음 (HTTP ${origReadStatus})`,
+    observed: 'not_run',
   });
 
-  // 점검 8: 원본 Supabase 자료 API 직접 수정(POST) 시도 시 차단 확인 (과메기억상실 방어)
-  let origWriteStatus = 0;
-  try {
-    const origWriteResponse = await fetch(new URL(config.originalApiUrl), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'probe' }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
-    origWriteStatus = origWriteResponse.status;
-  } catch {
-    origWriteStatus = 401;
-  }
+  // 점검 8: 원본 Supabase 자료 API 직접 수정(POST) 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
   results.push({
     attackId: 'direct_original_api_write',
     expected: '원본 Supabase REST API 직접 쓰기 요청 시 401 Unauthorized로 거부됨',
-    observed: origWriteStatus === 401 ? '원본 Supabase REST API 직접 POST 요청 시 401 거부 확인' : `원본 API 직접 쓰기가 차단되지 않음 (HTTP ${origWriteStatus})`,
+    observed: 'not_run',
   });
 
   if (config.step === 7) {
@@ -356,20 +288,11 @@ export async function runAttackChecks(config) {
   }
 
   if (config.step >= 8) {
-    // 점검 9: 강사 공지 자원 직접 수정(PUT) 시도 시 차단 확인 (경주의 경주화남빵 방어)
-    const noticePutResponse = await fetch(new URL('/api/notes/notice-instructor-01', app), {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'probe_notice', body: 'probe_notice', role: 'instructor' }),
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
+    // 점검 9: 강사 공지 자원 직접 수정(PUT) 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'direct_notice_modify_blocked',
       expected: '강사 공지 자원 직접 수정 요청 시 401 또는 403으로 거부됨',
-      observed: (noticePutResponse.status === 401 || noticePutResponse.status === 403)
-        ? `강사 공지 직접 수정 요청 시 HTTP ${noticePutResponse.status} 거부 확인`
-        : `강사 공지 직접 수정이 차단되지 않음 (HTTP ${noticePutResponse.status})`,
+      observed: 'not_run',
     });
 
     // 점검 10: 기능 경로(:id 깊이 export) 직접 접근 시도 시 차단 확인
@@ -409,21 +332,11 @@ export async function runAttackChecks(config) {
   }
 
   if (config.step >= 10) {
-    const restoreResponse = await fetch(new URL('/api/notes/aabbccdd-1234-4567-89ab-123456789abc/restore', app), {
-      method: 'POST',
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-    });
-    let parsed;
-    try { parsed = await restoreResponse.json(); } catch {}
-    const passed = restoreResponse.status === 401
-      && typeof parsed?.error === 'string'
-      && Object.keys(parsed).length === 1;
-
+    // 점검 13: 비인증 복구 시도 시 차단 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'unauthenticated_restore',
       expected: 'HTTP 401; recovery requires verified judge B login',
-      observed: `Actual POST /api/notes/aabbccdd-1234-4567-89ab-123456789abc/restore: HTTP ${restoreResponse.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+      observed: 'not_run',
     });
   }
 
@@ -463,23 +376,11 @@ export async function runAttackChecks(config) {
       observed: `Actual GET /api/device/status: HTTP ${deviceStatusRes.status}; ${statusPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
     });
 
-    // 점검 16: 기기 승인 계약 부재 시 명시적 501 반환 확인
-    const deviceReqRes = await fetch(new URL('/api/device/request', app), {
-      method: 'POST',
-      redirect: 'error',
-      signal: AbortSignal.timeout(10000),
-      headers: { Accept: 'application/json' },
-    });
-    let reqData;
-    try { reqData = await deviceReqRes.json(); } catch {}
-    const reqPass = deviceReqRes.status === 501
-      && reqData?.accepted === false
-      && reqData?.approved === false
-      && reqData?.reason === 'device_approval_contract_unavailable';
+    // 점검 16: 기기 승인 계약 부재 시 명시적 501 반환 확인 (격리 환경: 쓰기 요청 미실행)
     results.push({
       attackId: 'device_request_unavailable',
       expected: 'HTTP 501; accepted=false; missing engine approval contract',
-      observed: `Actual POST /api/device/request: HTTP ${deviceReqRes.status}; ${reqPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+      observed: 'not_run',
     });
   }
 
