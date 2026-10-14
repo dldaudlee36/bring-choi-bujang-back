@@ -1,7 +1,7 @@
 // The student changes this check as each stage adds an attack to the same app.
 // Never return tokens, private keys, real names, or note bodies.
 export async function runAttackChecks(config) {
-  if (config.step < 1 || config.step > 11) {
+  if (config.step < 1 || config.step > 12) {
     throw new Error('이 단계의 공격 점검을 src/attack-check.mjs에 구현해 주세요.');
   }
   let app;
@@ -480,6 +480,32 @@ export async function runAttackChecks(config) {
       attackId: 'device_request_unavailable',
       expected: 'HTTP 501; accepted=false; missing engine approval contract',
       observed: `Actual POST /api/device/request: HTTP ${deviceReqRes.status}; ${reqPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
+    });
+  }
+
+  if (config.step >= 12) {
+    // 점검 17: 작전실 실측 점검 API (GET /api/checks) 및 41종 총공세 분리 확인
+    const checksRes = await fetch(new URL('/api/checks', app), {
+      redirect: 'error',
+      signal: AbortSignal.timeout(15000),
+      headers: { Accept: 'application/json' },
+    });
+    let report;
+    try { report = await checksRes.json(); } catch {}
+    const reportPass = checksRes.status === 200
+      && report?.schema === 'aleph.operations.v1'
+      && report?.step === 12
+      && report?.summary?.mismatch === 0
+      && (report?.summary?.liveExecuted ?? 0) > 0
+      && Array.isArray(report?.cases)
+      && report.cases.some(r => r.type === 'normal' && r.result === 'matched')
+      && report.cases.some(r => r.type === 'forbidden' && r.result === 'matched')
+      && report?.assault?.total === 41
+      && report?.assault?.notRun === 41;
+    results.push({
+      attackId: 'operations_actual_records',
+      expected: 'HTTP 200; measured self-checks with timestamps; engine receipts separate',
+      observed: `Actual GET /api/checks: HTTP ${checksRes.status}; ${reportPass ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`,
     });
   }
 

@@ -1,7 +1,11 @@
-# BYTE BACK 방어전 | 내 자료실
+# BYTE BACK 방어전 12단계 저장점
 
-이 프로젝트는 SKT ALEPH 방어전 실습을 위한 가상 자료실 애플리케이션입니다.  
-포함된 메모 기록은 모두 실습을 위한 가상 데이터이며, 실제 개인정보나 비밀값은 포함되지 않습니다.
+현재 저장소는 **12단계: 탈환 작전실을 완성합니다**의 실제 HTTP 자기 점검·가상 규칙 시험과 가린 서버 기록 표를 추가한 상태입니다. 기존 로그인·메모·공지 API, 첨부 판정기·탐지기·복구 기능과 승인 전 화면을 유지합니다. 공식 총공세 영수증과 실제 회수·복구·기기 승인 결과는 별도이며 없는 기록을 통과로 표시하지 않습니다.
+
+- 저장소: https://github.com/dldaudlee36/bring-choi-bujang-back
+- Production: https://rescue-choi-bujang-pc.vercel.app
+- 단계 설정: `aleph.config.json`의 `step: 12`
+- 원본 자료 API: `https://mxiycelcxviyvsixuytr.supabase.co/rest/v1/learning_notes`
 
 ---
 
@@ -142,6 +146,28 @@
 - **실제 승인 연결의 정확한 차단점:** 이 저장소와 단계 안내에는 제공 엔진의 등록 요청 API, 서버가 검증할 기기 세션/서명 계약이 없습니다. 상태 API는 승인 전 `approved:false`, 요청 API는 `501`·`accepted:false`·`device_approval_contract_unavailable`을 반환합니다. 접수·승인을 완료했다고 기록하지 않습니다. 가짜 헤더로 승격하거나 별도의 기기 인증 체계를 만들어 엔진 규칙을 대체하지 않습니다.
 - 제공 엔진의 요청 서명 확인은 학생 화면의 책임으로 옮기지 않았습니다. 기존 자료 API의 로그인·소유자·강사 권한 검사와 판정기를 유지했습니다. 운영 서명 없는 요청·경로/본문 변경의 실제 엔진 시험은 미실행입니다.
 - 관련 로컬 시험 통과: `node --test test/device-approval.test.mjs`, `npm run test:r10`, `npm run decider:test`, `npm run detect:test`, `npm run build -- --local`. 승인된 서버 응답을 넣은 화면 단위시험은 실제 기기 승인 실측이 아닙니다.
+
+---
+
+## 12단계: 실제 기록을 읽는 탈환 작전실
+
+학생 몫은 `src/decider.mjs` 판정기, `src/detect.mjs` 탐지 규칙, `public/` 접속 앱, `api/` 자료실과 작전실 자기 점검입니다. **제공 엔진은 ALEPH SDP 엔진 사용**으로 출처를 구분합니다. 제공 엔진의 기기 등록·요청 서명 검증·정책 집행·회수·공식 심판 기록을 이 저장소의 화면 문구로 대신하지 않습니다. Supabase Auth는 로그인 검증에 사용합니다.
+
+`GET /api/checks`는 현재 배포에서 고정 자기 점검을 실행하고 메타데이터만 반환합니다. 공개 화면·빈 공개 자료·무인증 및 위조 신원 거부 등 실제 HTTP 9개와 판정기·탐지기 고정 가상 시험 7개를 분리합니다. 본인 인증 API·원본 Data API·실제 회수·실제 복구·승인 기기 시험 5개는 필요한 운영 인증/계약이 없어 미실행으로 남깁니다. 요청 ID는 학생 점검 UUID이며 별도로 얻은 Vercel 서버 요청 ID는 `serverRequestId`입니다. 두 값은 제공 엔진 영수증 ID가 아닙니다.
+
+화면의 수치는 같은 응답의 행을 합산합니다. 실행 오류는 미실행, 기대와 다른 HTTP/판정 결과는 불일치입니다. 서버 응답 본문, 로그인 토큰, 메모 내용, 실제 사용자 ID와 원문 오류는 반환하지 않습니다. 정책·복구 기준 버전은 검사한 판정기 파일의 UTF-8/LF SHA-256입니다. 회수는 가상 사건의 제안과 실제 집행을 분리합니다.
+
+공식 41종은 이 자기 점검과 다른 시험입니다. 공식 사례 카탈로그와 실행 영수증이 연결되지 않았으므로 이 보고서에서는 실행 0·방어 확인 0·미실행 41로 표시합니다. 앞 단계에서 알레프가 표시한 통과 이력도 이 커밋의 총공세 실측으로 옮겨 적지 않습니다. 12단계 최종 통과와 41종 방어는 학생이 제출한 뒤 공식 심판에서 확인합니다.
+
+### 검사한 커밋에서 설치·실행·중지·복구
+
+1. 설치: `git clone https://github.com/dldaudlee36/bring-choi-bujang-back`, 해당 폴더로 이동, `git checkout <제출 묶음 JSON의 commit>`, Node.js 22 이상에서 `npm ci`. 별도 접속 프로그램은 없습니다. 서버 비밀값은 Vercel 공식 환경변수 설정에만 둡니다.
+2. 실행: `npm run build -- --local`로 정적 빌드 확인. 실제 API는 기존 Vercel 프로젝트에 같은 커밋을 배포합니다. Production 식별 JSON의 commit과 제출 묶음의 commit을 대조합니다. 앱의 ‘탈환 작전실’에서 ‘실제 기록 새로 확인’을 누르고 ‘가린 서버 기록 JSON 받기’로 같은 응답을 저장합니다.
+3. 재현 시험: `node --experimental-vm-modules --test test/operations-report.test.mjs test/device-approval.test.mjs test/restore.test.mjs`. 이어 `npm run decider:test`, `npm run detect:test`, `npm run build -- --local`. 가상 시험을 운영 시험으로 보고하지 않습니다.
+4. 중지: Vercel 프로젝트 설정에서 프로젝트를 일시 중지하거나 제공 엔진의 공식 관리 화면에서 보호 경로 집행을 중지합니다. DB·백업·감사를 삭제하지 않습니다. 이 안내의 중지 조작은 실행하지 않았습니다.
+5. 복구: `git status`와 `git diff`를 확인하고 다른 작업을 보존합니다. 이미 배포돼 있는 직전 정상 커밋을 Vercel Instant Rollback으로 되돌리는 안을 검토하고 사용자의 확인 뒤 실행합니다. 코드 복원은 해당 단계 파일만 지정해 안전하게 복원하고 별도 커밋합니다. `reset --hard`는 사용하지 않습니다. 자료 복구는 앞 절의 검증된 한 건 복원 절차를 따릅니다.
+6. 복구 뒤 본인 허용·타인 거부·무인증 거부를 다시 실행합니다. 실제 인증이 필요한 시험을 수행하지 못하면 미실행으로 남깁니다.
+7. 커밋 후 `npm run bundle`을 실제 실행합니다. `bundle-notes.json`, `artifacts/submission.json`은 Git에서 제외하며 메모 내용·비밀값을 포장하지 않습니다. 묶음의 실제 HTTP 점검과 작전실 기록은 학생의 자기 점검이고 공식 심판 판정이 아닙니다.
 
 ---
 

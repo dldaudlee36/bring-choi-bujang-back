@@ -1,5 +1,5 @@
 {
-  "step": 11,
+  "step": 12,
   "repoUrl": "https://github.com/dldaudlee36/bring-choi-bujang-back",
   "publicAppUrl": "https://rescue-choi-bujang-pc.vercel.app",
   "sampleMarker": "SAMPLE_NOTE_1",
@@ -10,6 +10,8 @@
     "jwksUrl": "https://mxiycelcxviyvsixuytr.supabase.co/auth/v1/.well-known/jwks.json"
   },
   "allowedRoutes": [
+    "GET /api/checks",
+    "GET /api/notices",
     "POST /api/device/request",
     "GET /api/device/status",
     "POST /api/restore/:noteId",
