@@ -1,8 +1,10 @@
 import { createClient } from '@supabase/supabase-js';
 import config from '../../aleph.config.json' with { type: 'json' };
 import { createLoginVerifier } from '../../src/verify-login.mjs';
+import { resourceId } from '../../src/resource-id.mjs';
+import { noteTarget } from '../../src/note-target.mjs';
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
@@ -30,33 +32,14 @@ function validText(value, max) {
 }
 
 function hasOwnerField(payload) {
-  return payload && (
-    Object.prototype.hasOwnProperty.call(payload, 'owner_id')
-    || Object.prototype.hasOwnProperty.call(payload, 'ownerId')
-  );
+  return payload && Object.prototype.hasOwnProperty.call(payload, 'owner_id');
 }
 
 function noteResponse(note) {
-  return {
-    id: note.id,
-    title: note.title,
-    body: note.body ?? note.content ?? '',
-  };
-}
-
-function extractId(request) {
-  if (typeof request.url !== 'string') return null;
-  let url;
-  try { url = new URL(request.url, 'https://api.invalid'); } catch { return null; }
-  const segments = url.pathname.split('/').filter(Boolean);
-  const raw = segments[segments.length - 1];
-  if (!raw || !UUID_RE.test(raw)) return null;
-  return raw.toLowerCase();
+  return { id: note.id, title: note.title, body: note.body ?? note.content ?? '' };
 }
 
 export default async function handler(request, response) {
-  response.setHeader('Cache-Control', 'no-store');
-
   if (!['GET', 'PUT', 'DELETE'].includes(request.method)) {
     response.setHeader('Allow', 'GET, PUT, DELETE');
     return response.status(405).json({ error: 'Method not allowed' });
@@ -71,15 +54,15 @@ export default async function handler(request, response) {
     return response.status(401).json({ error: '로그인이 필요합니다.' });
   }
 
-  const rawId = extractId(request);
-  if (!rawId) {
+  const rawId = noteTarget(request);
+  if (typeof rawId !== 'string' || !UUID.test(rawId)) {
     response.setHeader('X-Aleph-Deny-Reason', 'invalid_resource_path');
     return response.status(400).json({ error: '올바른 메모 UUID가 필요합니다.' });
   }
 
-  response.setHeader('X-Aleph-Resource-Id', 'notes:' + rawId);
+  response.setHeader('Cache-Control', 'no-store');
+  response.setHeader('X-Aleph-Resource-Id', resourceId('notes', rawId));
 
-  // [GET] 단건 조회
   if (request.method === 'GET') {
     const { data, error } = await supabase
       .from('notes')
@@ -96,7 +79,6 @@ export default async function handler(request, response) {
     return response.status(200).json(noteResponse(data));
   }
 
-  // [PUT] 메모 변조/수정 (닭크웹 침해 테스트 시 호출됨)
   if (request.method === 'PUT') {
     const payload = bodyObject(request);
     if (!payload || hasOwnerField(payload)) {
@@ -141,7 +123,6 @@ export default async function handler(request, response) {
     return response.status(200).json(noteResponse(data));
   }
 
-  // [DELETE] 메모 삭제
   const { data, error } = await supabase
     .from('notes')
     .delete()
