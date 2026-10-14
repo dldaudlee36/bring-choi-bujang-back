@@ -10,6 +10,7 @@
     "jwksUrl": "https://mxiycelcxviyvsixuytr.supabase.co/auth/v1/.well-known/jwks.json"
   },
   "allowedRoutes": [
+    "POST /api/restore/:noteId",
     "GET /api/notes",
     "POST /api/notes",
     "GET /api/notes/:id",
@@ -19,5 +20,5 @@
     "POST /api/restore"
   ],
   "originalApiUrl": "https://mxiycelcxviyvsixuytr.supabase.co/rest/v1/notes",
-  "restoreRoute": "/api/restore"
+  "restoreRoute": "/api/restore/:noteId"
 }

@@ -51,11 +51,11 @@
 * **9단계: 도플갱어 탐지 및 권한 회수 제안 (`propose_revocation`)**:
   - 가상 사건에서 가명 사용자·기기·요청 종류·검증 신호만 안전하게 읽도록 판정기 입력 정제 함수(`parseDecisionRequest`)를 분리하고 토큰·실명·본문 저장을 배제했습니다.
   - 낯선 네트워크(`network === 'unusual'`)와 갑작스러운 다량 조회(`hasHighActivity`)가 동시에 나타날 때만 복합 의심 사건으로 판정하며, 지역(`region`) 하나만으로 확정하지 않고 정상 사건은 그대로 유지합니다.
-* **10단계: 안전 사본 기반 단건 메모 복구 서비스 (`POST /api/restore`)**:
-  - **서비스 및 경로**: 복구 서비스 (`restore`), 엔드포인트 `POST /api/restore`
-  - 비공개 가상 메모 사본(`backup/notes-backup.json`)을 기반으로 지정된 대상 1건의 ID·소유자(`owner_id`)·내용 해시(`contentHash`)를 엄격하게 대조한 뒤 복원합니다.
-  - 침해 사고 발생 시 시험 계정 B의 변조/삭제된 메모만 정밀 복원하며, 다른 사용자의 정상 메모와 감사 기록(`xdr/alerts.log`)은 일체 훼손 없이 보존합니다.
-  - 복구 요청 시 사본과 일치하지 않는 ID나 위변조된 내용 해시는 거부합니다.
+* **10단계: 안전 사본 기반 단건 메모 복구 및 시험 정책 복원 (`POST /api/restore/:noteId`, `src/trial-policy-restore.mjs`)**:
+  - **서비스 및 경로**: 복구 서비스 (`restore`), 엔드포인트 `POST /api/restore/:noteId`
+  - `src/trial-policy-restore.mjs`: `previewPolicyRestore`를 통해 사본 버전과 변경 범위(`service: notes`)를 사전 확인하고, `confirmationHash` 대조 시에만 `applyTrialPolicyRestore`로 복원하며 다른 서비스 규칙과 감사 이력은 온전히 보존합니다.
+  - `src/restore-api.mjs` & `api/restore/[noteId].js`: 심판 B 인증을 필수 검증하며 요청 본문의 임의 입력을 전면 차단(`restore_body_not_allowed`)하고, 서버의 비공개 검증 사본에서 지정된 1건의 메모만 복원합니다.
+  - 침해 사고 발생 시 시험 계정 B의 변조/삭제된 메모만 정밀 복원하며, 다른 사용자의 정상 메모와 감사 기록은 일체 훼손 없이 보존합니다.
 
 ---
 
@@ -73,13 +73,13 @@
 ### 1단계: 안전 정책 복원 및 시험 계정 B 메모 복구
 * **실행 명령**:
   ```bash
-  npm run policy:restore
+  npm run test:r10
   npm run restore:test
   ```
 * **정상 결과 (복원 확인)**:
-  - 정책 규칙(`RULE_IDS`) 및 허용 경로(`allowedRoutes`)가 침해 전 안전 사본(`Revision 9`)으로 정상 복원됩니다.
+  - `test:r10`: 시험 정책 사본 사전 검증, 변경 범위 확인 및 감사 보존 복구 3개 테스트 모두 통과.
   - 시험 계정 B의 메모가 사본과 동일한 ID(`a0000000-0000-0000-0000-000000000004`), 소유자(`b`), 내용 해시(`5d960ef1...`)로 복구됩니다.
-* **거부 결과**: 사본에 없는 메모 요청은 400, 내용 해시 불일치 요청은 400으로 거부됩니다.
+* **거부 결과**: 사본에 없는 메모 요청은 404/409, 내용 해시 불일치 요청은 409, 비인증 요청은 401로 거부됩니다.
 
 ### 2단계: 1~5단계 기본 접근 통제 및 게이트웨이 재검증
 * **실행 명령**:

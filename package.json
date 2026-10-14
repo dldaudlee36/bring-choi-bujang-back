@@ -13,6 +13,7 @@
     "policy:diff": "node src/policy-diff.mjs",
     "policy:restore": "node src/policy-restore.mjs",
     "restore:test": "node scripts/verify-restore.mjs",
+    "test:r10": "node --test test/restore.test.mjs",
     "xdr:run": "node scripts/xdr-run.mjs"
   },
   "engines": {
