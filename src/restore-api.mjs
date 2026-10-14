@@ -26,13 +26,11 @@ export function createRestoreHandler({ db, verifyLogin, policyDigest = async () 
     if (login.kind !== 'judge' || login.identity !== 'b') return deny(403, 'test_account_b_required');
     let url;
     try { url = new URL(request.url, 'https://api.invalid'); } catch { return deny(400, 'invalid_restore_path'); }
-    const match = /^\/api\/restore\/([0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})$/iu.exec(url.pathname);
-    if (!match || [...url.searchParams.keys()].some(key => key !== 'noteId')
-      || url.searchParams.getAll('noteId').length > 1
+    const match = /^\/api\/restore\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/iu.exec(url.pathname);
+    // 경로의 ID만 신뢰한다. 쿼리의 noteId가 경로와 다르면 거부하고, 그 밖의 쿼리와 요청 본문은 읽지 않고 무시한다.
+    if (!match || url.searchParams.getAll('noteId').length > 1
       || url.searchParams.getAll('noteId').some(id => id.toLowerCase() !== match[1].toLowerCase()))
       return deny(400, 'invalid_restore_path');
-    if (request.body && Object.keys(typeof request.body === 'object' ? request.body : { invalid: true }).length)
-      return deny(400, 'restore_body_not_allowed');
     const id = match[1].toLowerCase();
     seenId = id;
     const digest = await policyDigest();

@@ -4,7 +4,7 @@ import config from '../aleph.config.json' with { type: 'json' };
 import { trace, tokenHint, entryHint } from '../src/request-trace.mjs';
 import { createLoginVerifier } from '../src/verify-login.mjs';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const supabaseUrl = process.env.SUPABASE_URL;
 const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 

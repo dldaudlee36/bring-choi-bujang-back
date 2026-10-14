@@ -69,12 +69,26 @@ test('restore uses verified B owner and exact ID, and never accepts client owner
     { login: { kind: 'student', identity: 'b', userId: 'synthetic_b' } },
     { login: { kind: 'judge', identity: 'a', userId: 'synthetic_a' } },
     { url: '/api/restore/' + id + '?noteId=other' },
-    { body: { owner_id: 'other', title: 'replacement' } },
   ]) {
     const denied = await invoke(options);
     assert.notEqual(denied.res.code, 200);
     assert.equal(denied.calls.length, 0);
   }
+});
+
+test('restore ignores any request body and extra query values; only the path ID and verified owner are used', async () => {
+  const result = await invoke({ body: { owner_id: 'other', title: 'replacement', content: 'evil' }, url: '/api/restore/' + id + '?x=1&owner=other' });
+  assert.equal(result.res.code, 200);
+  assert.deepEqual(Object.keys(result.calls[0][1]).sort(), ['p_note_id', 'p_owner_id', 'p_policy_sha256']);
+  assert.equal(result.calls[0][1].p_owner_id, 'synthetic_b');
+  assert.equal(result.calls[0][1].p_note_id, id);
+});
+
+test('seed-style IDs (non RFC4122 version/variant) are accepted as the same single note', async () => {
+  const seed = 'a0000000-0000-0000-0000-000000000004';
+  const result = await invoke({ url: '/api/restore/' + seed, data: { restored: true, noteId: seed, contentSha256: 'a'.repeat(64) } });
+  assert.equal(result.res.code, 200);
+  assert.equal(result.calls[0][1].p_note_id, seed);
 });
 
 test('missing or mismatched backup is refused, and no memo content is returned', async () => {
