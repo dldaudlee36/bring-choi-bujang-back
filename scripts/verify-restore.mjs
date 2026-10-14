@@ -125,3 +125,17 @@ if (previewRes.statusCode === 200 && previewRes.body?.preview && previewRes.body
   process.stderr.write(`❌ 사전 검증 미리보기 오류: HTTP ${previewRes.statusCode}\n`);
   process.exitCode = 1;
 }
+
+// 7. GET 요청 시 실행 전 버전 및 변경 항목 미리보기 확인 테스트
+const getRes = mockRes();
+await handler({
+  method: 'GET',
+  headers: {},
+}, getRes);
+
+if (getRes.statusCode === 200 && getRes.body?.preview && getRes.body?.version && getRes.body?.changeScope) {
+  process.stdout.write('✅ GET 요청 시 실행 전 버전 및 변경 예정 항목 미리보기를 확인했습니다.\n');
+} else {
+  process.stderr.write(`❌ GET 미리보기 오류: HTTP ${getRes.statusCode}\n`);
+  process.exitCode = 1;
+}

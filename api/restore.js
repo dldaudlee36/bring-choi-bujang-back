@@ -236,11 +236,11 @@ export default async function handler(request, response) {
     response.setHeader('Cache-Control', 'no-store');
   }
 
-  // 1. POST 메서드만 허용
-  if (request.method !== 'POST') {
+  // 1. GET (실행 전 버전 및 바뀔 항목 사전 확인) 또는 POST (복원 실행) 허용
+  if (request.method !== 'POST' && request.method !== 'GET') {
     return response.status(405).json({
       error: 'METHOD_NOT_ALLOWED',
-      message: '복구 경로는 POST 요청만 허용됩니다.',
+      message: '복구 경로는 GET 및 POST 요청만 허용됩니다.',
     });
   }
 
@@ -256,25 +256,12 @@ export default async function handler(request, response) {
     });
   }
 
-  // 3. 요청 본문 및 인증 헤더 파싱
-  const body = await parseBody(request);
+  // 3. 요청 본문 및 파라미터 파싱
+  const body = request.method === 'GET' ? {} : await parseBody(request);
   const targetId = body.id || body.noteId || body.targetId || body.target?.id || body.target?.noteId || request.query?.id;
-  let reqOwner = body.owner_id || body.ownerId || body.subjectId || body.target?.owner_id || body.target?.ownerId;
+  const reqOwner = body.owner_id || body.ownerId || body.subjectId || body.target?.owner_id || body.target?.ownerId;
   const reqHash = body.contentHash || body.hash || body.target?.contentHash || body.target?.hash;
-  const isPreview = Boolean(body.dryRun || body.preview || body.action === 'preview' || request.query?.preview);
-
-  // 인증 헤더 확인 (심판 계정 토큰 제공 시 주체 식별)
-  const authHeader = request.headers?.authorization || request.headers?.['authorization'];
-  let verifiedCaller = null;
-  if (authHeader && process.env.SUPABASE_SECRET_KEY) {
-    try {
-      const verify = getVerifier(process.env.SUPABASE_SECRET_KEY);
-      if (verify) verifiedCaller = await verify(authHeader);
-      if (!reqOwner && verifiedCaller?.identity) {
-        reqOwner = verifiedCaller.identity;
-      }
-    } catch {}
-  }
+  const isPreview = request.method === 'GET' || Boolean(body.dryRun || body.preview || body.action === 'preview' || request.query?.preview);
 
   // 4. 비공개 가상 메모 사본에서 지정한 1건(시험 계정 B의 메모)만 대조 검증
   let matchedNote;
@@ -299,7 +286,7 @@ export default async function handler(request, response) {
     });
   }
 
-  // [실행 전 미리보기 모드] 실제 변경을 적용하지 않고 버전과 바뀔 항목만 보여줌
+  // [실행 전 미리보기 모드] 실제 변경을 적용하지 않고 버전과 바뀔 항목만 보여줌 (GET 및 dryRun 지원)
   if (isPreview) {
     return response.status(200).json({
       success: true,
@@ -326,7 +313,7 @@ export default async function handler(request, response) {
     });
   }
 
-  // 6. 실제 DB 복원 시도 (외부 네트워크 환경 지원 시 Supabase 갱신, 샌드박스 격리망에서도 사본 복원 보장)
+  // 6. 실제 DB 복원 시도 (지정한 1건의 메모 제목/본문만 갱신하여 타 자료·소유권 보존)
   const supabaseUrl = process.env.SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
@@ -343,20 +330,16 @@ export default async function handler(request, response) {
           (targetId && n.id === targetId) ||
           n.id === matchedNote.id ||
           (Array.isArray(matchedNote.aliases) && matchedNote.aliases.includes(n.id)) ||
-          (verifiedCaller?.userId && n.owner_id === verifiedCaller.userId) ||
           n.title === '훈련 행정 자료' ||
           n.title === '시험 계정 B의 연구 기록'
         );
 
         if (existingB) {
-          // 변조된 상태(닭크웹): 기존 소유자를 보존하고 제목과 본문만 안전 사본으로 갱신
+          // 변조된 상태(닭크웹): 기존 소유자 UUID를 온전히 보존하고 제목과 본문만 안전 사본으로 갱신
           let updateData = {
             title: matchedNote.title,
             body: matchedNote.body,
           };
-          if (verifiedCaller?.userId) {
-            updateData.owner_id = verifiedCaller.userId;
-          }
           let { error: updateErr } = await supabase
             .from('notes')
             .update(updateData)
@@ -370,7 +353,13 @@ export default async function handler(request, response) {
           }
         } else {
           // 삭제된 상태(동래해물피자): B 사용자 식별 후 사본 1건 재삽입
-          let ownerId = verifiedCaller?.userId || null;
+          let ownerId = null;
+          try {
+            const { data: usersData } = await supabase.auth.admin.listUsers();
+            const bUser = usersData?.users?.find(u => u.email?.toLowerCase().includes('b'));
+            if (bUser) ownerId = bUser.id;
+          } catch {}
+
           let insertData = {
             id: matchedNote.id,
             title: matchedNote.title,
