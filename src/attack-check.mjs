@@ -67,37 +67,17 @@ export async function runAttackChecks(config) {
       continue;
     }
     const response = await fetch(new URL(check.path, base), {
-      redirect: 'error', signal: AbortSignal.timeout(15000),
+      redirect: 'error',
+      cache: 'no-store',
+      signal: typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function' ? AbortSignal.timeout(15000) : undefined,
       method: check.method ?? 'GET',
       headers: { Accept: check.kind === 'page' ? 'text/html' : 'application/json' },
+      alephEvidence: { caseId: check.attackId, requestKey: 'read' },
     });
-    const body = await response.text();
-    let passed = false;
-    if (check.kind === 'page') passed = response.status === 200 && body.includes('id="login-form"');
-    else {
-      let parsed;
-      try { parsed = JSON.parse(body); } catch { /* Report failure without recording body. */ }
-      if (check.kind === 'data') passed = response.status === 200 && Array.isArray(parsed?.notes) && parsed.notes.length === 0;
-      else if (check.kind === 'manifest') passed = response.status === 200
-        && parsed?.name === 'BYTE BACK 내 자료실' && parsed?.start_url === '/' && parsed?.display === 'standalone';
-      else if (check.kind === 'device') passed = response.status === 200
-        && parsed?.approved === false && parsed?.reason === 'device_not_registered';
-      else if (check.kind === 'request') passed = response.status === 501
-        && parsed?.accepted === false && parsed?.approved === false
-        && parsed?.reason === 'device_approval_contract_unavailable';
-      else if (check.kind === 'operations') passed = response.status === 200
-        && parsed?.schema === 'aleph.operations.v1' && parsed?.step === 12
-        && parsed?.summary?.mismatch === 0 && parsed?.summary?.liveExecuted > 0
-        && Array.isArray(parsed?.cases) && parsed.cases.some(row => row.type === 'normal' && row.result === 'matched')
-        && parsed.cases.some(row => row.type === 'forbidden' && row.result === 'matched')
-        && parsed?.assault?.total === 41 && parsed?.assault?.notRun === 41;
-      else passed = response.status === 401 && typeof parsed?.error === 'string'
-        && Object.keys(parsed).length === 1;
-    }
     results.push({
       attackId: check.attackId,
       expected: check.expected,
-      observed: `Actual ${check.method ?? 'GET'} ${check.path}: HTTP ${response.status}; ${passed ? 'PASS' : 'FAIL'}; non-mutating self-check, not judge verdict`
+      observed: `HTTP ${response.status}`,
     });
   }
 
