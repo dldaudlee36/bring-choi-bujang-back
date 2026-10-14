@@ -85,7 +85,6 @@ begin
  insert into public.notes(id, owner_id, title, body, content, created_at)
  values(b.note_id, b.owner_id, b.title, b.content, b.content, b.created_at)
  on conflict(id) do update set
-   owner_id = excluded.owner_id,
    title = excluded.title,
    body = excluded.body,
    content = excluded.content,
