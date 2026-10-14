@@ -68,7 +68,7 @@ begin
  if not found then return jsonb_build_object('error', 'verified_backup_missing'); end if;
  if b.owner_id <> p_owner_id then return jsonb_build_object('error', 'not_found_or_not_owned'); end if;
  actual_hash := encode(extensions.digest(convert_to(jsonb_build_object('title', b.title, 'content', b.content)::text, 'UTF8'), 'sha256'), 'hex');
- if b.provenance <> 'original_insert' or actual_hash <> b.content_sha256
+ if b.provenance not in ('original_insert','baseline_verified') or actual_hash <> b.content_sha256
     or b.policy_sha256 <> p_policy_sha256 then
   return jsonb_build_object('error', 'backup_verification_failed');
  end if;
